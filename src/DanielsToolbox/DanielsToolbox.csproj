@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+    <AssemblyName>dt</AssemblyName>
+    <RootNamespace>DanielsToolbox</RootNamespace>
+    <Configurations>Debug;Release;Build</Configurations>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client.Dynamics" Version="0.4.12" />
+    <PackageReference Include="ShellProgressBar" Version="5.1.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta1.21216.1" />
+    <PackageReference Include="System.ComponentModel.Composition" Version="5.0.0" />
+    <PackageReference Include="System.IO.Packaging" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.ApplicationInsights">
+      <HintPath>..\..\Lib\Microsoft.ApplicationInsights.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.PowerPlatform.Tooling.BatchedTelemetry">
+      <HintPath>..\..\Lib\Microsoft.PowerPlatform.Tooling.BatchedTelemetry.dll</HintPath>
+    </Reference>
+    <Reference Include="SolutionPackagerLib">
+      <HintPath>Lib\SolutionPackagerLib.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="dt.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Lib\" />
+  </ItemGroup>
+
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="dt-dd $(ProjectDir)" />
+  </Target>
+
+</Project>

@@ -5,7 +5,7 @@
     <TargetFramework>net5.0</TargetFramework>
     <AssemblyName>dt</AssemblyName>
     <RootNamespace>DanielsToolbox</RootNamespace>
-    <Configurations>Debug;Release;Build</Configurations>
+    <Configurations>Debug;Release;Build;Local</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

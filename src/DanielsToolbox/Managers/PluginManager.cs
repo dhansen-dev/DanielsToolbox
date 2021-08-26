@@ -32,16 +32,21 @@ namespace DanielsToolbox.Managers
         
         }
 
-        public static void RegisterPluginsInCRM(RegisterPluginsCommandLine commandLine, ServiceClient client)
+        public static async Task RegisterPluginsInCRM(RegisterPluginsCommandLine commandLine, ServiceClient client)
         {
             var pluginAssembly = new PluginAssembly(commandLine.PluginAssemblyPath.FullName);
 
-            RegisterPluginAssembly(client, commandLine, pluginAssembly);
+            if (commandLine.SyncPluginSteps)
+            {
+                await SyncRemotePlugins(client, pluginAssembly);
+            }
+
+            await RegisterPluginAssembly(client, commandLine, pluginAssembly);
         }
 
-        public static Guid RegisterPluginAssembly(IOrganizationService organizationService, RegisterPluginsCommandLine commandLine, PluginAssembly pluginAssembly)
+        public static async Task<Guid> RegisterPluginAssembly(ServiceClient client, RegisterPluginsCommandLine commandLine, PluginAssembly pluginAssembly)
         {
-            var o = organizationService;
+            var o = client;
 
             Guid pluginAssemblyId;
 
@@ -73,7 +78,7 @@ namespace DanielsToolbox.Managers
                 {
                     Console.WriteLine("Registering plugin " + plugin.TypeName);
 
-                    RegisterPluginSteps(organizationService, commandLine.SolutionName, pluginAssemblyId, plugin);
+                    RegisterPluginSteps(client, commandLine.SolutionName, pluginAssemblyId, plugin);
                 }
             }
             else
@@ -81,6 +86,77 @@ namespace DanielsToolbox.Managers
             }
 
             return pluginAssemblyId;
+        }
+
+        private static async Task SyncRemotePlugins(ServiceClient client, PluginAssembly localPluginAssembly)
+        {
+            var assemblyQuery = new QueryExpression("pluginassembly");
+            assemblyQuery.Criteria.AddCondition("name", ConditionOperator.Equal, localPluginAssembly.Name);
+
+            var pluginTypes = assemblyQuery.AddLink("plugintype", "pluginassemblyid", "pluginassemblyid", JoinOperator.Inner);
+            pluginTypes.EntityAlias = "pluginType";
+            pluginTypes.Columns.AllColumns = true;
+
+            var steps = pluginTypes.AddLink("sdkmessageprocessingstep", "plugintypeid", "eventhandler", JoinOperator.LeftOuter);
+            steps.EntityAlias = "step";
+            steps.Columns.AllColumns = true;
+
+            var plugins = await client.RetrieveMultipleAsync(assemblyQuery);
+
+            foreach (var remotePluginType in plugins.Entities.ToLookup(e => GetAliasedValue<Guid>(e, "pluginType.plugintypeid")))
+            {
+                var localPluginType = localPluginAssembly.Plugins.SingleOrDefault(localPlugin => localPlugin.ExtensionId == remotePluginType.Key);
+
+                if (localPluginType != null)
+                {
+                    var remotePluginSteps = remotePluginType.ToDictionary(t => GetAliasedValue<Guid>(t, "step.sdkmessageprocessingstepid"));
+
+                    var localPluginStepIds = localPluginType.PluginSteps.Select(localPluginStep => localPluginStep.Id);
+                    var remotePluginStepIds = remotePluginSteps.Select(remotePluginStep => remotePluginStep.Key);
+
+                    var stepDiff = remotePluginStepIds.Except(localPluginStepIds);
+
+                    if (stepDiff.Any())
+                    {
+                        foreach (var removedStep in stepDiff)
+                        {
+                            if (GetAliasedValue<BooleanManagedProperty>(remotePluginSteps[removedStep], "step.iscustomizable").Value)
+                            {
+                                Console.WriteLine("Will remove step " + removedStep);
+                            }
+                        }
+                    } 
+                    else
+                    {
+                        foreach(var remotePluginStep in remotePluginSteps)
+                        {
+                            var remoteImageQuery = new QueryExpression("sdkmessageprocessingstepimage")
+                            {
+                                ColumnSet = new ColumnSet(true)
+                            };
+                            remoteImageQuery.Criteria.AddCondition("sdkmessageprocessingstepid", ConditionOperator.Equal, remotePluginStep.Key);
+
+                            var remoteImageEntities = (await client.RetrieveMultipleAsync(remoteImageQuery))?.Entities;
+
+                            var remoteImages = remoteImageEntities.Select(image => image.GetAttributeValue<OptionSetValue>("imagetype").Value);
+                            var localImages = localPluginType.PluginSteps.Single(localPlugin => localPlugin.Id == remotePluginStep.Key)?.EntityImages.Select(localEntityImages => (int)localEntityImages.EntityImageType);
+
+                            var imageDiffs = remoteImages.Except(localImages);
+
+                            foreach(var imageDiff in imageDiffs)
+                            {
+                                var remoteImageIdToDelete = remoteImageEntities.Single(remoteImage => remoteImage.GetAttributeValue<OptionSetValue>("imagetype").Value == imageDiff);
+
+                                Console.WriteLine("Deleting image " + remoteImageIdToDelete);
+                            }
+                        }
+                    }
+                } 
+                else
+                {
+                    Console.WriteLine("Will remove plugin type " + remotePluginType.Key);
+                }
+            }
         }
 
         public static void RegisterPluginSteps(IOrganizationService organizationService, string solutionName, Guid pluginAssemblyId, Plugin plugin)
@@ -322,7 +398,14 @@ namespace DanielsToolbox.Managers
                         postEntityImageId = o.Create(postImage);
                     }
                 }
+
+                
             }
+
+
         }
+
+        private static TType GetAliasedValue<TType>(Entity e, string attributeLogicalName)
+                => e.TryGetAttributeValue<AliasedValue>(attributeLogicalName, out var value) ? (TType)value.Value : default;
     }
 }

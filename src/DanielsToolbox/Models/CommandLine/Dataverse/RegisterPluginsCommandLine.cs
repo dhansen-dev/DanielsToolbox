@@ -19,13 +19,16 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
         public string SolutionName { get; init; }
         public FileInfo PluginAssemblyPath { get; init; }
         public bool UpdateOnlyPluginAssembly { get; init; }
+
+        public bool SyncPluginSteps { get; init;  }
         public DataverseServicePrincipalCommandLine DataverseServicePrincipalCommandLine { get; set; }
 
         public static IEnumerable<Symbol> Arguments()
             => new Symbol[] {
                 new Argument<FileInfo>("pluginassemblypath", "Path to plugin assembly").ExistingOnly(),
                 new Option<bool>("--update-only-plugin-assembly", "Only update assembly"),
-                new Option<string>("--solution-name", "Will add assembly and related data to named solution")
+                new Option<string>("--solution-name", "Will add assembly and related data to named solution"),
+                new Option<bool>("--sync-plugin-steps", () => true, "Will sync remote plugin steps with local")
             };
 
         public static Command Create()
@@ -36,16 +39,16 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                 Arguments()
             };
 
-            command.Handler = CommandHandler.Create<RegisterPluginsCommandLine>(handler => handler.RegisterPluginsInAssembly());
+            command.Handler = CommandHandler.Create<RegisterPluginsCommandLine>(async handler => await handler.RegisterPluginsInAssembly());
 
             return command;
         }
 
-        private void RegisterPluginsInAssembly()
+        private async Task RegisterPluginsInAssembly()
         {
            ServiceClient client = DataverseServicePrincipalCommandLine.Connect();
 
-            PluginManager.RegisterPluginsInCRM(this, client);
+            await PluginManager.RegisterPluginsInCRM(this, client);
         }
     }
 }

@@ -117,7 +117,13 @@ namespace DanielsToolbox.Models
 
     public class PluginAssembly
     {
-        private string pluginAssemblyPath;
+        private readonly string pluginAssemblyPath;
+
+        public PluginAssembly(string name, Version version)
+        {
+            Name = name;
+            Version =  version;
+        }
 
         public PluginAssembly(string pluginAssemblyPath)
         {            

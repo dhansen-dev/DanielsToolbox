@@ -22,7 +22,8 @@ namespace PowerPlatformCLI
                     ExportSolutionCommandLine.Create(),
                     ImportSolutionCommandLine.Create(),
                     PackImportSolutionCommandLine.Create(),
-                    ExportExtractSolutionCommandLine.Create()
+                    ExportExtractSolutionCommandLine.Create(),
+                    RegisterPluginsCommandLine.Create()
                 },
                 new Command("azure-devops")
                 {

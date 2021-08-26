@@ -42,12 +42,12 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                 new Option<CommandAction>("--action", "Action to Perform"),
                 new Option<FileInfo>("--path-to-zip-file", "Path to file containing solution"),
                 new Option<FileInfo>("--mapping-file", "Path to mapping file").ExistingOnly(),
-                new Option<FileInfo>("--log-file").ExistingOnly(),
-                new Option<TraceLevel>("--error-level"),
+                new Option<FileInfo>("--log-file", () => new FileInfo(@"c:\temp\sollog.txt")).ExistingOnly(),
+                new Option<TraceLevel>("--error-level", () => TraceLevel.Verbose),
                 new Option<SolutionPackageType>("--package-type"),
-                new Option<AllowDelete>("--allow-deletes"),
-                new Option<AllowWrite>("--allow-writes"),
-                new Option<bool>("--clobber"),
+                new Option<AllowDelete>("--allow-deletes", () => AllowDelete.Yes, "Default Yes"),
+                new Option<AllowWrite>("--allow-writes", () => AllowWrite.Yes, "Default Yes"),
+                new Option<bool>("--clobber",() => true),
                 new Option<string>("--single-component", () => "NONE", "Default NONE")
             };
 
@@ -73,7 +73,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             var telemetryClient = new AppTelemetryClient(defaultTelemetryConfiguration);
 
             var packager = new SolutionPackager(_arguments, telemetryClient);
-
+            
             packager.Run();
 
             if (_arguments.Action == CommandAction.Extract)
@@ -82,8 +82,8 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                 {
                     var doc = JsonDocument.Parse(File.ReadAllText(flowDefinition.FullName));
 
-                    using Stream waypointsStreamWriter = new FileStream(flowDefinition.FullName, FileMode.OpenOrCreate);
-                    var utf8MemoryWriter = new Utf8JsonWriter(waypointsStreamWriter, new JsonWriterOptions
+                    using Stream flowDefinitionStreamWriter = new FileStream(flowDefinition.FullName, FileMode.OpenOrCreate);
+                    var utf8MemoryWriter = new Utf8JsonWriter(flowDefinitionStreamWriter, new JsonWriterOptions
                     {
                         Indented = true
                     });
@@ -93,7 +93,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                     utf8MemoryWriter.Flush();
                 }
             }
-            Console.WriteLine("Solution extracted");
+            Console.WriteLine("Solution packager executed successfully");
         }
     }
 }

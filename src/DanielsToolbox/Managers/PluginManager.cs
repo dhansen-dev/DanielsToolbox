@@ -134,6 +134,7 @@ namespace DanielsToolbox.Managers
                             {
                                 ColumnSet = new ColumnSet(true)
                             };
+
                             remoteImageQuery.Criteria.AddCondition("sdkmessageprocessingstepid", ConditionOperator.Equal, remotePluginStep.Key);
 
                             var remoteImageEntities = (await client.RetrieveMultipleAsync(remoteImageQuery))?.Entities;
@@ -267,6 +268,11 @@ namespace DanielsToolbox.Managers
 
         public static void AddSolutionComponent(IOrganizationService o, Guid componentId, int componentType, string solutionName)
         {
+            if(solutionName == null)
+            {
+                return;
+            }
+
             o.Execute(new OrganizationRequest("AddSolutionComponent")
             {
                 Parameters = new ParameterCollection

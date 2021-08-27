@@ -23,7 +23,8 @@ namespace PowerPlatformCLI
                     ImportSolutionCommandLine.Create(),
                     PackImportSolutionCommandLine.Create(),
                     ExportExtractSolutionCommandLine.Create(),
-                    RegisterPluginsCommandLine.Create()
+                    RegisterPluginsCommandLine.Create(),
+                    SynchronizeWebResourcesCommandLine.Create()
                 },
                 new Command("azure-devops")
                 {

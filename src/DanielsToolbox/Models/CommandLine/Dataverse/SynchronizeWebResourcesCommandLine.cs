@@ -9,14 +9,34 @@ using System.Threading.Tasks;
 
 using DanielsToolbox.Extensions;
 
-
+using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace DanielsToolbox.Models.CommandLine.Dataverse
 {
     public class SynchronizeWebResourcesCommandLine
     {
+
+        private Dictionary<string ,int> WebResourceType = new()
+        {
+            { ".html", 1 },
+            { ".htm", 1 },
+            { ".css", 2 },
+            { ".js", 3 },
+            { ".xml", 4 },
+            { ".png", 5 },
+            { ".jpg", 6 },
+            { ".jpeg", 6 },
+            { ".gif", 7 },
+            { ".xap", 8 },
+            { ".xsl", 9 },
+            { ".ico", 10 },
+            { ".svg", 11 },
+            { ".resx", 12 }
+        };
+
         public DataverseServicePrincipalCommandLine DataverseServicePrincipalCommandLine { get; init; }
         public DirectoryInfo BaseFolder { get; init; }
 
@@ -53,6 +73,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             {
                 ColumnSet = new ColumnSet(true)
             };
+
             solutionIdQuery.Criteria.AddCondition("uniquename", ConditionOperator.Equal, SolutionName);
 
             var solutionIdQueryResult = (await client.RetrieveMultipleAsync(solutionIdQuery));
@@ -69,48 +90,89 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
               .Select(webresource => new { WebResourceName = webresource.WebresourceName.Replace("\\", "/").ToLowerInvariant(), Content = Convert.ToBase64String(File.ReadAllBytes(webresource.FullPath)) })
               .ToDictionary(e => e.WebResourceName);
 
-            var solutionComponentQuery = new QueryExpression("solutioncomponent")
+
+
+            var solutionComponentQuery = new QueryExpression("webresource")
             {
                 ColumnSet = new ColumnSet(true)
             };
 
-            solutionComponentQuery.Criteria.AddCondition("componenttype", ConditionOperator.Equal, 61);
-            solutionComponentQuery.Criteria.AddCondition("solutionid", ConditionOperator.Equal, solutionId);
-
-            var webResourceLink = solutionComponentQuery.AddLink("webresource", "objectid", "webresourceid");
-            webResourceLink.EntityAlias = "webresource";
+            var webResourceLink = solutionComponentQuery.AddLink("solutioncomponent", "webresourceid", "objectid");
+            webResourceLink.EntityAlias = "sc";
             webResourceLink.Columns.AllColumns = true;
+            webResourceLink.LinkCriteria.AddCondition("solutionid", ConditionOperator.Equal, solutionId);
 
-            var remoteWebResourcesEntities = (await client.RetrieveMultipleAsync(solutionComponentQuery)).Entities;
-            
-            var remoteWebResources = remoteWebResourcesEntities.ToDictionary(e => ((string)(e.GetAttributeValue<AliasedValue>("webresource.name")).Value).ToLowerInvariant());
+            var remoteUnpublishedWebResourcesEntities = ((RetrieveUnpublishedMultipleResponse)client.Execute(new RetrieveUnpublishedMultipleRequest
+            {
+                Query = solutionComponentQuery
+            })).EntityCollection.Entities;
+
+            var remoteWebResources = remoteUnpublishedWebResourcesEntities.ToDictionary(e => e.GetAttributeValue<string>("name").ToLowerInvariant());
             
             var remoteWebResourcesToDelete = remoteWebResources.Select(remote => remote.Key).Except(localWebResources.Select(local => local.Key));
 
+            OrganizationRequestCollection requests = new();
+
             foreach(var webResourceToDelete in remoteWebResourcesToDelete)
             {
-                Console.WriteLine("Wil delete " + webResourceToDelete);
-            }
+                Console.WriteLine("Will delete " + webResourceToDelete);
+
+                client.Delete("webresource", remoteWebResources[webResourceToDelete].Id);
+            }            
 
             var localWebResourcesToAdd = localWebResources.Select(local => local.Key).Except(remoteWebResources.Select(remote => remote.Key));
 
             foreach(var webResourceToAdd in localWebResourcesToAdd)
             {
+                var webResourceId = await client.CreateAsync(new Entity("webresource")
+                {
+                    Attributes = {
+                            { "name", webResourceToAdd },
+                            { "webresourcetype", new OptionSetValue(WebResourceType[Path.GetExtension(webResourceToAdd)]) },
+                            { "displayname", webResourceToAdd },
+                            { "content", localWebResources[webResourceToAdd].Content }
+                    }
+                });
+
+                await client.ExecuteAsync(new OrganizationRequest("AddSolutionComponent")
+                 {
+                     Parameters = new ParameterCollection
+                {
+                    { "ComponentId", webResourceId },
+                    { "ComponentType", 61 },
+                    { "SolutionUniqueName", SolutionName },
+                    { "AddRequiredComponents", false },
+                    { "DoNotIncludeSubcomponents", false }
+                }
+                 });
+                
                 Console.WriteLine("Will add " + webResourceToAdd);
             }
 
             var updatedWebResources = from localWebResource in localWebResources
                                       from remoteWebResource in remoteWebResources
                                       where localWebResource.Key == remoteWebResource.Key
-                                      where localWebResource.Value.Content != remoteWebResource.Value.GetAliasedValue<string>("webresource.content")
-                                      select localWebResource.Value;
+                                      where localWebResource.Value.Content != remoteWebResource.Value.GetAttributeValue<string>("content")
+                                      select new
+                                      {
+                                          WebresourceName = localWebResource.Value.WebResourceName,
+                                          WebresourceId = remoteWebResource.Value.GetAttributeValue<Guid>("webresourceid"),
+                                          UpdatedContent = localWebResource.Value.Content,
+                                          RemoteDisplayName = remoteWebResource.Value.GetAttributeValue<string>("displayname")
+                                      };
 
             foreach(var updatedWebResource in updatedWebResources)
             {
-                Console.WriteLine("Will update " + updatedWebResource.WebResourceName);
+                Console.WriteLine("Will update " + updatedWebResource.WebresourceName);
+
+                await client.UpdateAsync(new Entity("webresource", updatedWebResource.WebresourceId)
+                {
+                    Attributes =
+                    {
+                        { "content", updatedWebResource.UpdatedContent }
+                    }
+                });
             }
-
-
         }
     }
 }

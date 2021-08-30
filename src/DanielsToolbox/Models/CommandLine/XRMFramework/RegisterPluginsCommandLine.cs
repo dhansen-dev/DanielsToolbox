@@ -9,10 +9,11 @@ using System.Threading.Tasks;
 
 using DanielsToolbox.Extensions;
 using DanielsToolbox.Managers;
+using DanielsToolbox.Models.CommandLine.Dataverse;
 
 using Microsoft.PowerPlatform.Dataverse.Client;
 
-namespace DanielsToolbox.Models.CommandLine.Dataverse
+namespace DanielsToolbox.Models.CommandLine.XRMFramework
 {
     public class RegisterPluginsCommandLine
     {
@@ -20,7 +21,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
         public FileInfo PluginAssemblyPath { get; init; }
         public bool UpdateOnlyPluginAssembly { get; init; }
 
-        public bool SyncPluginSteps { get; init;  }
+        public bool SyncPluginSteps { get; init; }
         public DataverseServicePrincipalCommandLine DataverseServicePrincipalCommandLine { get; set; }
 
         public static IEnumerable<Symbol> Arguments()
@@ -33,7 +34,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         public static Command Create()
         {
-            var command = new Command("pluginregistration")
+            var command = new Command("pluginregistration", "Register plugin assembly with optional steps and images in dataverse")
             {
                 DataverseServicePrincipalCommandLine.Arguments(),
                 Arguments()
@@ -46,7 +47,8 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         private async Task RegisterPluginsInAssembly()
         {
-           ServiceClient client = DataverseServicePrincipalCommandLine.Connect();
+
+            ServiceClient client = DataverseServicePrincipalCommandLine.Connect();
 
             await PluginManager.RegisterPluginsInCRM(this, client);
         }

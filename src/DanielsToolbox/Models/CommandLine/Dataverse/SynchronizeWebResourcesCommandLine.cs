@@ -6,10 +6,12 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 using DanielsToolbox.Extensions;
 
 using Microsoft.Crm.Sdk.Messages;
+using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
@@ -44,12 +46,15 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         public string SearchPattern { get; init;  }
 
+        public bool Publish { get; init; }
+
         public static IEnumerable<Symbol> Arguments()
          => new Symbol[]
          {
              new Argument<DirectoryInfo>("base-folder", "Base folder for web resources").ExistingOnly(),
              new Argument<string>("solutionName", "Name of solution containing webresources"),
-             new Option<string>("--search-pattern", () => "*.*")
+             new Option<string>("--search-pattern", () => "*.*"),
+             new Option<bool>("--publish", () => true, "Publish updated webresources")
          };
 
         public static Command Create()
@@ -67,6 +72,9 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         private async Task SynchronizeWebResources()
         {
+
+            ImportExportXML webresourcesToPublish = new();
+
             var client = DataverseServicePrincipalCommandLine.Connect();
 
             var solutionIdQuery = new QueryExpression("solution")
@@ -89,8 +97,6 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
               .Where(webresource => !webresource.WebresourceName.StartsWith(".") && webresource.WebresourceName != null)
               .Select(webresource => new { WebResourceName = webresource.WebresourceName.Replace("\\", "/").ToLowerInvariant(), Content = Convert.ToBase64String(File.ReadAllBytes(webresource.FullPath)) })
               .ToDictionary(e => e.WebResourceName);
-
-
 
             var solutionComponentQuery = new QueryExpression("webresource")
             {
@@ -135,16 +141,16 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                 });
 
                 await client.ExecuteAsync(new OrganizationRequest("AddSolutionComponent")
-                 {
-                     Parameters = new ParameterCollection
                 {
-                    { "ComponentId", webResourceId },
-                    { "ComponentType", 61 },
-                    { "SolutionUniqueName", SolutionName },
-                    { "AddRequiredComponents", false },
-                    { "DoNotIncludeSubcomponents", false }
-                }
-                 });
+                    Parameters = new ParameterCollection
+                    {
+                        { "ComponentId", webResourceId },
+                        { "ComponentType", 61 },
+                        { "SolutionUniqueName", SolutionName },
+                        { "AddRequiredComponents", false },
+                        { "DoNotIncludeSubcomponents", false }
+                    }
+                });
                 
                 Console.WriteLine("Will add " + webResourceToAdd);
             }
@@ -172,7 +178,59 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                         { "content", updatedWebResource.UpdatedContent }
                     }
                 });
+
+                webresourcesToPublish.AddWebresource(updatedWebResource.WebresourceId);
             }
+            if (Publish && webresourcesToPublish.webresources.Any())
+            {
+                PublishWebresources(client, webresourcesToPublish);
+            }
+        }
+
+        private static void PublishWebresources(ServiceClient client, ImportExportXML resourcesToPublish)
+        {
+            Console.WriteLine("Publishing webresources");
+
+            client.Execute(new PublishXmlRequest
+            {
+                ParameterXml = resourcesToPublish.ToPublishXML()
+            });
+
+            Console.WriteLine("Webresources published");
+        }
+
+        [XmlRoot("importexportxml")]
+        public class ImportExportXML
+        {
+            [XmlElement("webresources")]
+            public List<Webresource> webresources = new();
+
+            public void AddWebresource(Guid webresourceId)
+            {
+                webresources.Add(new Webresource
+                {
+                    webresource = webresourceId
+                });
+            }
+
+            public string ToPublishXML()
+            {
+                XmlSerializer x = new(typeof(ImportExportXML));
+
+                var ms = new MemoryStream();
+                
+                x.Serialize(ms, this);
+                
+                var publishXml = Encoding.UTF8.GetString(ms.ToArray());
+
+                return publishXml;
+            }
+        }
+
+        public class Webresource
+        {
+            [XmlElement("webresource")]
+            public Guid webresource;
         }
     }
 }

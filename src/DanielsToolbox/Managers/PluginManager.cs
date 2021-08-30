@@ -1,5 +1,5 @@
 ﻿using DanielsToolbox.Models;
-using DanielsToolbox.Models.CommandLine.Dataverse;
+using DanielsToolbox.Models.CommandLine.XRMFramework;
 
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
@@ -50,7 +50,7 @@ namespace DanielsToolbox.Managers
 
             Guid pluginAssemblyId;
 
-            var existingPluginAssemblyId = GetExistingEntityId(o, "pluginassembly", new ConditionExpression("name", ConditionOperator.Equal, pluginAssembly.Name));
+            var existingPluginAssemblyId = await GetExistingEntityId(o, "pluginassembly", new ConditionExpression("name", ConditionOperator.Equal, pluginAssembly.Name));
 
             var entity = CreatePluginAssembly(pluginAssembly.Data, pluginAssembly.Name, pluginAssembly.Version);
 
@@ -67,7 +67,7 @@ namespace DanielsToolbox.Managers
                 Console.WriteLine("Creating plugin assembly " + pluginAssembly.Name);
                 pluginAssemblyId = o.Create(entity);
 
-                AddSolutionComponent(o, pluginAssemblyId, 91, commandLine.SolutionName);
+                await AddSolutionComponent(o, pluginAssemblyId, 91, commandLine.SolutionName);
             }
 
             Console.WriteLine("Done with plugin assembly");
@@ -78,7 +78,7 @@ namespace DanielsToolbox.Managers
                 {
                     Console.WriteLine("Registering plugin " + plugin.TypeName);
 
-                    RegisterPluginSteps(client, commandLine.SolutionName, pluginAssemblyId, plugin);
+                    await RegisterPluginSteps(client, commandLine.SolutionName, pluginAssemblyId, plugin);
                 }
             }
             else
@@ -160,9 +160,8 @@ namespace DanielsToolbox.Managers
             }
         }
 
-        public static void RegisterPluginSteps(IOrganizationService organizationService, string solutionName, Guid pluginAssemblyId, Plugin plugin)
-        {
-            var o = organizationService;
+        public static async Task RegisterPluginSteps(ServiceClient client, string solutionName, Guid pluginAssemblyId, Plugin plugin)
+        {           
 
             var lengthOfDescription = plugin.ExtensionDescription?.Length > 256 ? 256 : (plugin.ExtensionDescription?.Length ?? 0);
 
@@ -179,17 +178,17 @@ namespace DanielsToolbox.Managers
                         }
             };
 
-            var existingPluginTypeId = GetExistingEntityId(o, "plugintype", new ConditionExpression("typename", ConditionOperator.Equal, plugin.FullName));
+            var existingPluginTypeId = await GetExistingEntityId(client, "plugintype", new ConditionExpression("typename", ConditionOperator.Equal, plugin.FullName));
             Guid pluginTypeId;
             if (existingPluginTypeId.HasValue)
             {
                 pluginTypeId = existingPluginTypeId.Value;
                 pluginTypeEntity.Id = pluginTypeId;
-                o.Update(pluginTypeEntity);
+                await client.UpdateAsync(pluginTypeEntity);
             }
             else
             {
-                pluginTypeId = o.Create(pluginTypeEntity);
+                pluginTypeId = await client.CreateAsync(pluginTypeEntity);
             }
 
             foreach (var step in plugin.PluginSteps)
@@ -208,7 +207,7 @@ namespace DanielsToolbox.Managers
 
                 messageQuery.Criteria.AddCondition("name", ConditionOperator.Equal, step.Message);
 
-                var messages = o.RetrieveMultiple(messageQuery).Entities;
+                var messages = (await client.RetrieveMultipleAsync(messageQuery)).Entities;
 
                 var message = messages[0];
 
@@ -223,7 +222,7 @@ namespace DanielsToolbox.Managers
                 {
                     messageFilterQuery.Criteria.AddCondition("primaryobjecttypecode", ConditionOperator.Equal, step.TriggerOnEntity);
                     messageFilterQuery.Criteria.AddCondition("sdkmessageid", ConditionOperator.Equal, message?.Id);
-                    var messageFilterResult = o.RetrieveMultiple(messageFilterQuery);
+                    var messageFilterResult = await client.RetrieveMultipleAsync(messageFilterQuery);
 
                     messageFilter = messageFilterResult.Entities[0];
                 }
@@ -248,32 +247,32 @@ namespace DanielsToolbox.Managers
 
                 Guid stepId;
 
-                var existingStepId = GetExistingEntityId(o, "sdkmessageprocessingstep", new ConditionExpression("sdkmessageprocessingstepid", ConditionOperator.Equal, step.Id));
+                var existingStepId = await GetExistingEntityId(client, "sdkmessageprocessingstep", new ConditionExpression("sdkmessageprocessingstepid", ConditionOperator.Equal, step.Id));
 
                 if (existingStepId.HasValue)
                 {
                     stepId = existingStepId.Value;
                     stepToCreate.Id = stepId;
-                    o.Update(stepToCreate);
+                    await client.UpdateAsync(stepToCreate);
                 }
                 else
                 {
-                    stepId = o.Create(stepToCreate);
-                    AddSolutionComponent(o, stepId, 92, solutionName);
+                    stepId = await client.CreateAsync(stepToCreate);
+                    await AddSolutionComponent(client, stepId, 92, solutionName);
                 }
 
-                RegisterPluginImages(o, step, stepId);
+                await RegisterPluginImages(client, step, stepId);
             }
         }
 
-        public static void AddSolutionComponent(IOrganizationService o, Guid componentId, int componentType, string solutionName)
+        public static async Task AddSolutionComponent(ServiceClient client, Guid componentId, int componentType, string solutionName)
         {
             if(solutionName == null)
             {
-                return;
+                await Task.CompletedTask;
             }
 
-            o.Execute(new OrganizationRequest("AddSolutionComponent")
+            await client.ExecuteAsync(new OrganizationRequest("await AddSolutionComponent")
             {
                 Parameters = new ParameterCollection
                 {
@@ -300,7 +299,7 @@ namespace DanielsToolbox.Managers
             };
         }
 
-        public static Guid? GetExistingEntityId(IOrganizationService o, string entityLogicalName, params ConditionExpression[] conditions)
+        public static async Task<Guid?> GetExistingEntityId(ServiceClient client, string entityLogicalName, params ConditionExpression[] conditions)
         {
             var queryExpression = new QueryExpression(entityLogicalName)
             {
@@ -315,7 +314,7 @@ namespace DanielsToolbox.Managers
                 queryExpression.Criteria.AddCondition(condition);
             }
 
-            var result = o.RetrieveMultiple(queryExpression);
+            var result = await client.RetrieveMultipleAsync(queryExpression);
 
             if (result.Entities.Count() > 1)
             {
@@ -329,7 +328,7 @@ namespace DanielsToolbox.Managers
             return result.Entities[0].Id;
         }
 
-        public static void RegisterPluginImages(IOrganizationService o, PluginStep step, Guid stepId)
+        public static async Task RegisterPluginImages(ServiceClient client, PluginStep step, Guid stepId)
         {
             foreach (var entityImage in step.EntityImages)
             {
@@ -353,7 +352,7 @@ namespace DanielsToolbox.Managers
                             }
                     };
 
-                    var existingPreImageId = GetExistingEntityId(o, "sdkmessageprocessingstepimage",
+                    var existingPreImageId = await GetExistingEntityId(client, "sdkmessageprocessingstepimage",
                         new ConditionExpression("entityalias", ConditionOperator.Equal, "preEntityImage"),
                         new ConditionExpression("sdkmessageprocessingstepid", ConditionOperator.Equal, stepId)
                         );
@@ -362,11 +361,11 @@ namespace DanielsToolbox.Managers
                     {
                         preEntityImageId = existingPreImageId.Value;
                         preImage.Id = preEntityImageId;
-                        o.Update(preImage);
+                        client.Update(preImage);
                     }
                     else
                     {
-                        preEntityImageId = o.Create(preImage);
+                        preEntityImageId = client.Create(preImage);
                     }
                 }
 
@@ -388,7 +387,7 @@ namespace DanielsToolbox.Managers
                             }
                     };
 
-                    var existingPostImageId = GetExistingEntityId(o, "sdkmessageprocessingstepimage",
+                    var existingPostImageId = await GetExistingEntityId(client, "sdkmessageprocessingstepimage",
                         new ConditionExpression("entityalias", ConditionOperator.Equal, "postEntityImage"),
                         new ConditionExpression("sdkmessageprocessingstepid", ConditionOperator.Equal, stepId)
                         );
@@ -397,11 +396,11 @@ namespace DanielsToolbox.Managers
                     {
                         postEntityImageId = existingPostImageId.Value;
                         postImage.Id = postEntityImageId;
-                        o.Update(postImage);
+                        client.Update(postImage);
                     }
                     else
                     {
-                        postEntityImageId = o.Create(postImage);
+                        postEntityImageId = client.Create(postImage);
                     }
                 }
 

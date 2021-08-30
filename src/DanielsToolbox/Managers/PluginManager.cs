@@ -173,7 +173,7 @@ namespace DanielsToolbox.Managers
                             { "typename", plugin.FullName },
                             { "name", plugin.FullName },
                             { "friendlyname", plugin.TypeName },
-                            { "description", plugin.ExtensionDescription?.Substring(0, lengthOfDescription) }, //nstance.PluginDescription?.Substring(0, 256) ?? pluginType.Name },
+                            { "description", plugin.ExtensionDescription?.Substring(0, lengthOfDescription) },
                             { "pluginassemblyid", new EntityReference("pluginassembly", pluginAssemblyId) }
                         }
             };

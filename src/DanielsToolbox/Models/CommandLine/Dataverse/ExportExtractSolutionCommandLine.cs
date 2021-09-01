@@ -1,6 +1,7 @@
 ﻿using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.IO;
+using System.Threading.Tasks;
 
 using DanielsToolbox.Extensions;
 
@@ -22,14 +23,14 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                 SolutionPackagerCommandLine.Arguments()
             };
 
-            command.Handler = CommandHandler.Create<ExportExtractSolutionCommandLine>(a => a.ExportExtract());
+            command.Handler = CommandHandler.Create<ExportExtractSolutionCommandLine>(async handler => await handler.ExportExtract());
 
             return command;
         }
 
-        public void ExportExtract()
+        public async Task ExportExtract()
         {
-            ExportSolutionCommandLine.ExportSolution(PathToZipFile);
+            await ExportSolutionCommandLine.ExportSolution(PathToZipFile);
 
             ExtractSolutionCommandLine.RunSolutionPackager();
         }

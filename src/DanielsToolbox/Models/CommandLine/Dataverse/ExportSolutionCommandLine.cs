@@ -9,6 +9,7 @@ using System.IO;
 
 using DanielsToolbox.Extensions;
 using System.CommandLine.Invocation;
+using System.Threading.Tasks;
 
 namespace DanielsToolbox.Models.CommandLine.Dataverse
 {
@@ -30,29 +31,40 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                Arguments()
             };
 
-            command.Handler = CommandHandler.Create<ExportSolutionCommandLine>(a => a.ExportSolution());
+            command.Handler = CommandHandler.Create<ExportSolutionCommandLine>(async handler => await handler.ExportSolution());
 
             return command;
         }
 
-        public string ExportSolution()
-                    => ExportSolution(new FileInfo(Path.GetTempFileName()));
+        public async Task<string> ExportSolution()
+                    => await ExportSolution(new FileInfo(Path.GetTempFileName()));
 
-        public string ExportSolution(FileInfo pathToSaveSolutionZip)
+        public async Task<string> ExportSolution(FileInfo pathToSaveSolutionZip)
         {
             ServiceClient client = DataverseServicePrincipalCommandLine.Connect();
 
             var zipPath = pathToSaveSolutionZip.FullName;
 
-            Console.WriteLine("Exporting solution");
+            Console.Write("Exporting solution .");
 
             var timer = Stopwatch.StartNew();
 
-            var exportSolutionResponse = (ExportSolutionResponse)client.Execute(new ExportSolutionRequest
+            var exportSolutionResponseTask = client.ExecuteAsync(new ExportSolutionRequest
             {
                 SolutionName = SolutionName,
                 Managed = false
             });
+
+            while(!exportSolutionResponseTask.IsCompleted)
+            {
+                Console.Write(".");
+
+                await Task.Delay(5000);
+            }
+
+            var exportSolutionResponse = (ExportSolutionResponse)(await exportSolutionResponseTask);
+
+            Console.WriteLine();
 
             Console.WriteLine($"Solution exported in {timer.Elapsed:c}");
 

@@ -10,6 +10,7 @@ using System.IO;
 using DanielsToolbox.Extensions;
 using System.CommandLine.Invocation;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace DanielsToolbox.Models.CommandLine.Dataverse
 {
@@ -45,7 +46,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             var zipPath = pathToSaveSolutionZip.FullName;
 
-            Console.Write("Exporting solution .");
+            Console.WriteLine($"Exporting solution {SolutionName}");
 
             var timer = Stopwatch.StartNew();
 
@@ -55,16 +56,16 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                 Managed = false
             });
 
-            while(!exportSolutionResponseTask.IsCompleted)
-            {
-                Console.Write(".");
+            int count = 1;
 
+            while(!exportSolutionResponseTask.IsCompleted)
+            {              
                 await Task.Delay(5000);
+
+                Console.WriteLine(string.Join("", Enumerable.Repeat(".", count++)));
             }
 
             var exportSolutionResponse = (ExportSolutionResponse)(await exportSolutionResponseTask);
-
-            Console.WriteLine();
 
             Console.WriteLine($"Solution exported in {timer.Elapsed:c}");
 

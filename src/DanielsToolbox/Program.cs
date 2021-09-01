@@ -1,6 +1,7 @@
 ﻿using DanielsToolbox.Models.CommandLine.AzureDevops;
 using DanielsToolbox.Models.CommandLine.Dataverse;
 using DanielsToolbox.Models.CommandLine.PowerAutomate;
+using DanielsToolbox.Models.CommandLine.XRMFramework;
 
 using System.CommandLine;
 using System.Threading.Tasks;
@@ -22,11 +23,16 @@ namespace PowerPlatformCLI
                     ExportSolutionCommandLine.Create(),
                     ImportSolutionCommandLine.Create(),
                     PackImportSolutionCommandLine.Create(),
-                    ExportExtractSolutionCommandLine.Create()
+                    ExportExtractSolutionCommandLine.Create(),
+                    SynchronizeWebResourcesCommandLine.Create()
                 },
                 new Command("azure-devops")
                 {
                     CreatePullRequestCommandLine.Create()
+                },
+                new Command("xrmframework", "Tolls related to XRMFramework")
+                {
+                    RegisterPluginsCommandLine.Create(),
                 }
             }.InvokeAsync(args);
     }

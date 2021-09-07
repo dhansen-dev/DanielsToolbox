@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Loader;
 
 using static DanielsToolbox.Models.PluginStepImage;
 
@@ -17,15 +18,15 @@ namespace DanielsToolbox.Models
             Id = Guid.Parse(propertyType.GetProperty(nameof(Id)).GetValue(o).ToString());
             Name = (string)propertyType.GetProperty(nameof(Name)).GetValue(o);
             Rank = (int)propertyType.GetProperty(nameof(Rank)).GetValue(o);
-            AsyncAutoDelete = (int)propertyType.GetProperty(nameof(AsyncAutoDelete)).GetValue(o);
+            AsyncAutoDelete = (AsyncAutoDeleteEnum)propertyType.GetProperty(nameof(AsyncAutoDelete)).GetValue(o);
             Description = (string)propertyType.GetProperty(nameof(Description)).GetValue(o);
             EntityImages = GetEntityImages(propertyType, o);
             FilteringAttributes = (string[])propertyType.GetProperty(nameof(FilteringAttributes)).GetValue(o);
-            Stage = (int)propertyType.GetProperty(nameof(Stage)).GetValue(o);
-            SupportedDeployment = (int)propertyType.GetProperty(nameof(SupportedDeployment)).GetValue(o);
+            Stage = (ExecutionStage)propertyType.GetProperty(nameof(Stage)).GetValue(o);
+            SupportedDeployment = (SupportedDeploymentEnum)propertyType.GetProperty(nameof(SupportedDeployment)).GetValue(o);
             TriggerOnEntity = (string)propertyType.GetProperty(nameof(TriggerOnEntity)).GetValue(o);
             Message = (string)propertyType.GetProperty(nameof(Message)).GetValue(o);
-            Mode = (int)propertyType.GetProperty(nameof(Mode)).GetValue(o);
+            Mode = (ExecutionMode)propertyType.GetProperty(nameof(Mode)).GetValue(o);
             PluginType = pluginType;
         }
 
@@ -42,7 +43,7 @@ namespace DanielsToolbox.Models
             { "Update", "Target" }
         };
 
-        public int AsyncAutoDelete { get; }
+        public AsyncAutoDeleteEnum AsyncAutoDelete { get; }
 
         public string Description { get; }
 
@@ -56,13 +57,13 @@ namespace DanielsToolbox.Models
 
         public int Rank { get; }
 
-        public int Stage { get; }
+        public ExecutionStage Stage { get; }
 
-        public int SupportedDeployment { get; }
+        public SupportedDeploymentEnum SupportedDeployment { get; }
 
         public string TriggerOnEntity { get; }
         public string Message { get; }
-        public int Mode { get; }
+        public ExecutionMode Mode { get; }
 
         public Type PluginType { get; }
 
@@ -92,6 +93,33 @@ namespace DanielsToolbox.Models
 
             return images;
         }
+
+        public enum ExecutionMode
+        {
+            Synchronous = 0,
+            Asynchronous = 1
+        };
+
+        public enum ExecutionStage
+        {
+            PreValidation = 10,
+            PreOperation = 20,
+            MainOperation = 30,
+            PostOperation = 40
+        }
+
+        public enum AsyncAutoDeleteEnum
+        {
+            Yes = 1,
+            No = 0
+        }
+
+        public enum SupportedDeploymentEnum
+        {
+            ServerOnly = 0,
+            MicrosoftDynamics365ClientForOutlookOnly = 1,
+            Both = 2
+        }
     }
 
     public class PluginStepImage
@@ -119,10 +147,11 @@ namespace DanielsToolbox.Models
     {
         private readonly string pluginAssemblyPath;
 
-        public PluginAssembly(string name, Version version)
+
+        static PluginAssembly()
         {
-            Name = name;
-            Version =  version;
+            var fullPath = Path.GetFullPath("LIB\\Microsoft.Xrm.Sdk.dll");
+            AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
         }
 
         public PluginAssembly(string pluginAssemblyPath)

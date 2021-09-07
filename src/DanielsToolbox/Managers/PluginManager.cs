@@ -19,14 +19,6 @@ namespace DanielsToolbox.Managers
 {
     public class PluginManager
     {
-
-        static PluginManager()
-        {
-            var fullPath = Path.GetFullPath("LIB\\Microsoft.Xrm.Sdk.dll");
-            AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
-        }
-        
-
         public PluginManager()
         {
         
@@ -233,12 +225,12 @@ namespace DanielsToolbox.Managers
                             {
                                 {"sdkmessageprocessingstepid", step.Id },
                                 { "filteringattributes", step.FilteringAttributes != null ? string.Join(",", step.FilteringAttributes) : "" },
-                                { "mode", new OptionSetValue(step.Mode) },
+                                { "mode", new OptionSetValue((int)step.Mode) },
                                 { "name", step.Name },
                                 { "description", step.Description },
                                 { "rank", step.Rank },
-                                { "stage", new OptionSetValue(step.Stage)},
-                                { "supporteddeployment", new OptionSetValue(step.SupportedDeployment) },
+                                { "stage", new OptionSetValue((int)step.Stage)},
+                                { "supporteddeployment", new OptionSetValue((int)step.SupportedDeployment) },
                                 { "plugintypeid", new EntityReference("plugintype", pluginTypeId) },
                                 { "sdkmessageid",message.ToEntityReference() },
                                 { "sdkmessagefilterid",  messageFilter?.ToEntityReference() }

@@ -62,7 +62,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             {              
                 await Task.Delay(5000);
 
-                Console.WriteLine(string.Join("", Enumerable.Repeat(".", count++)));
+                Console.WriteLine(new string('.', count++));
             }
 
             var exportSolutionResponse = (ExportSolutionResponse)(await exportSolutionResponseTask);

@@ -30,9 +30,10 @@ namespace PowerPlatformCLI
                 {
                     CreatePullRequestCommandLine.Create()
                 },
-                new Command("xrmframework", "Tolls related to XRMFramework")
+                new Command("xrmframework", "Tools related to XRMFramework")
                 {
                     RegisterPluginsCommandLine.Create(),
+                    DocumentPluginsCommandLine.Create()
                 }
             }.InvokeAsync(args);
     }

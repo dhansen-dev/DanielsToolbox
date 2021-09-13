@@ -4,15 +4,13 @@ using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Threading.Tasks;
 
 using System.Text.Json;
 
 using DanielsToolbox.Extensions;
-using System.Net;
+using DanielsToolbox.Managers;
+using DanielsToolbox.Models.CommandLine.AzureDevops;
 
 namespace DanielsToolbox.Models.CommandLine.XRMFramework
 {
@@ -20,22 +18,12 @@ namespace DanielsToolbox.Models.CommandLine.XRMFramework
     {
         public FileInfo PluginAssemblyPath { get; init; }
 
-        public string PersonalAccessToken { get; init; }
-
-        public string OrganizationName { get;init;  }
-        public string ProjectName { get;init; }
-        public string WikiName { get; init; }
-        public string ParentPageName { get; init; }
+        public DevOpsWikiClientCommandLine DevOpsWikiClient { get; init; }
 
         public static IEnumerable<Symbol> Arguments() 
             => new Symbol[]
             {
-                new Argument<FileInfo>("pluginassemblypath", "Path to plugin assembly").ExistingOnly(),
-                new Argument<string>("personalaccesstoken", "Personal access token"),
-                new Argument<string>("organizationname", "Organization name"),
-                new Argument<string>("projectname", "Project name"),
-                new Argument<string>("wikiname", "Name of wiki"),
-                new Argument<string>("parentpagename", "Name of parent Page for doc")
+                new Argument<FileInfo>("pluginassemblypath", "Path to plugin assembly").ExistingOnly()
             };
 
 
@@ -43,7 +31,8 @@ namespace DanielsToolbox.Models.CommandLine.XRMFramework
         {
             var command = new Command("generate-plugin-doc", "Generates documentation for specified plugin assembly")
             {
-                Arguments()
+                Arguments(),
+                DevOpsWikiClientCommandLine.Arguments()
             };
 
             command.Handler = CommandHandler.Create<DocumentPluginsCommandLine>(async handler => await handler.DocumentPlugins());
@@ -55,9 +44,7 @@ namespace DanielsToolbox.Models.CommandLine.XRMFramework
         {
             var assembly = new PluginAssembly(PluginAssemblyPath.FullName);
 
-            var client = CreateClient();
-
-            var parentPageResponse = await CreateOrUpdatePage(ParentPageName, new WikiPage { Content = ParentPageName }, client);
+            var parentPageResponse = await DevOpsWikiClient.CreateOrUpdatePage(DevOpsWikiClient.ParentPageName, new WikiPage { Content = DevOpsWikiClient.ParentPageName });
 
             var options = new JsonSerializerOptions
             {
@@ -70,6 +57,7 @@ namespace DanielsToolbox.Models.CommandLine.XRMFramework
 
             foreach (var plugin in assembly.Plugins)
             {
+                Console.WriteLine("Generating documentation for " + plugin.TypeName);
 
                 var wikiContent = "# " + plugin.FullName + Environment.NewLine;
 
@@ -100,7 +88,7 @@ namespace DanielsToolbox.Models.CommandLine.XRMFramework
                     Content = wikiContent
                 };
 
-                var updateChildPageResponse = await CreateOrUpdatePage($"{parentWiki.Path}/{plugin.TypeName}", childWikiPage, client);
+                var updateChildPageResponse = await DevOpsWikiClient.CreateOrUpdatePage($"{parentWiki.Path}/{plugin.TypeName}", childWikiPage);
 
                 var childResponse = await updateChildPageResponse.Content.ReadAsStringAsync();
 
@@ -108,56 +96,11 @@ namespace DanielsToolbox.Models.CommandLine.XRMFramework
             }
 
 
-            await CreateOrUpdatePage(ParentPageName, parentWiki, client);
+            await DevOpsWikiClient.CreateOrUpdatePage(DevOpsWikiClient.ParentPageName, parentWiki);
 
            
 
             await Task.CompletedTask;
         }
-
-        private async Task<HttpResponseMessage> CreateOrUpdatePage(string path, WikiPage page, HttpClient client)
-        {
-            HttpResponseMessage createOrUpdateResponse = null;
-
-            var pageContent = JsonSerializer.Serialize(page);
-
-            var getPageResponse = await client.GetAsync("?path=" + path);
-
-            var pageResponse = await getPageResponse.Content.ReadAsStringAsync();
-
-            if (getPageResponse.IsSuccessStatusCode)
-            {
-                var request = new HttpRequestMessage(HttpMethod.Put, $"?path={path}&api-version=6.0")
-                {
-                    Content = new StringContent(pageContent, Encoding.Default, "application/json")
-                };
-
-                request.Headers.Add("If-Match", getPageResponse.Headers.ETag.Tag);
-
-                createOrUpdateResponse = await client.SendAsync(request);
-
-                createOrUpdateResponse.EnsureSuccessStatusCode();
-            } 
-            else
-            {
-                createOrUpdateResponse = await client.PutAsync($"?path={path}&api-version=6.0", new StringContent(pageContent, Encoding.Default, "application/json"));
-
-                var createPageString = await createOrUpdateResponse.Content.ReadAsStringAsync();
-
-                createOrUpdateResponse.EnsureSuccessStatusCode();
-            }
-
-            return createOrUpdateResponse;
-        }
-
-        private HttpClient CreateClient()
-            => new()
-            {
-                BaseAddress = new Uri($"https://dev.azure.com/{OrganizationName}/{ProjectName}/_apis/wiki/wikis/{WikiName}/pages/"),
-                DefaultRequestHeaders =
-                {
-                    Authorization = new AuthenticationHeaderValue("basic", Convert.ToBase64String(Encoding.Default.GetBytes($":{PersonalAccessToken}")))
-                }
-            };
     }
 }

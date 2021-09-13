@@ -95,7 +95,7 @@ namespace DanielsToolbox.Managers
 
             var plugins = await client.RetrieveMultipleAsync(assemblyQuery);
 
-            foreach (var remotePluginType in plugins.Entities.ToLookup(e => GetAliasedValue<Guid>(e, "pluginType.plugintypeid")))
+            foreach (var remotePluginType in plugins.Entities.Where(r => GetAliasedValue<Guid>(r, "step.sdkmessageprocessingstepid") != Guid.Empty).ToLookup(e => GetAliasedValue<Guid>(e, "pluginType.plugintypeid")))
             {
                 var localPluginType = localPluginAssembly.Plugins.SingleOrDefault(localPlugin => localPlugin.ExtensionId == remotePluginType.Key);
 
@@ -264,7 +264,7 @@ namespace DanielsToolbox.Managers
                 await Task.CompletedTask;
             }
 
-            await client.ExecuteAsync(new OrganizationRequest("await AddSolutionComponent")
+            await client.ExecuteAsync(new OrganizationRequest("AddSolutionComponent")
             {
                 Parameters = new ParameterCollection
                 {

@@ -8,6 +8,9 @@ using System.Linq;
 
 using DanielsToolbox.Extensions;
 using DanielsToolbox.Models.CommandLine.Dataverse;
+using Microsoft.PowerPlatform.Dataverse.Client;
+using System.Collections.Generic;
+using DanielsToolbox.Helpers;
 
 namespace DanielsToolbox.Models.CommandLine.PowerAutomate
 {
@@ -33,46 +36,27 @@ namespace DanielsToolbox.Models.CommandLine.PowerAutomate
         {
             var client = DataverseServicePrincipalCommandLine.Connect();
 
-            var context = new OrganizationServiceContext(client);
-
-            var inactiveFlowsQuery =
-
-                from solution in context.CreateQuery("solution")
-                join component in context.CreateQuery("solutioncomponent")
-                on solution.GetAttributeValue<Guid>("solutionid") equals component.GetAttributeValue<EntityReference>("solutionid").Id
-                join workflow in context.CreateQuery("workflow")
-                on component.GetAttributeValue<Guid>("objectid") equals workflow.GetAttributeValue<Guid>("workflowid")
-                where
-                    solution.GetAttributeValue<string>("uniquename") == SolutionName &&
-                    component.GetAttributeValue<OptionSetValue>("componenttype").Value == 29 &&
-                    workflow.GetAttributeValue<OptionSetValue>("category").Value == 5 &&
-                    workflow.GetAttributeValue<OptionSetValue>("statecode").Value == 0 &&
-                    workflow.GetAttributeValue<OptionSetValue>("statuscode").Value == 1
-                select new
-                {
-                    SolutionId = solution.Id,
-                    ComponentId = component.Id,
-                    Workflow = new { Id = workflow.GetAttributeValue<Guid>("workflowid"), CreatedOn = workflow.GetAttributeValue<DateTime>("createdon"), Name = workflow.GetAttributeValue<string>("name") }
-                };
-
-            var inactiveFlows = inactiveFlowsQuery.ToList();
+            var inactiveFlows = QueryHelper
+                                    .GetModernWorkFlows(client, SolutionName)
+                                    .Where(w => w.StateCode == 0 && w.StatusCode == 1)
+                                    .OrderByDescending(w => w.CreatedOn);
 
             Console.WriteLine($"\nFound {inactiveFlows.Count()} flows to enable");
 
-            foreach (var inactiveFlow in inactiveFlowsQuery.ToList().OrderByDescending(c => c.Workflow.CreatedOn))
+            foreach (var inactiveFlow in inactiveFlows)
             {
-                Console.WriteLine($"Enabling flow called {inactiveFlow.Workflow.Name}");
+                Console.WriteLine($"Enabling flow called {inactiveFlow.Name}");
 
-                var enabledFlow = new Entity("workflow", inactiveFlow.Workflow.Id)
+                var enabledFlow = new Entity("workflow", inactiveFlow.Id)
                 {
-                    ["workflowid"] = inactiveFlow.Workflow.Id,
+                    ["workflowid"] = inactiveFlow.Id,
                     ["statecode"] = new OptionSetValue(1),
                     ["statuscode"] = new OptionSetValue(2)
                 };
 
                 client.Update(enabledFlow);
 
-                Console.WriteLine($"{inactiveFlow.Workflow.Name} enabled");
+                Console.WriteLine($"{inactiveFlow.Name} enabled");
             }
         }
     }

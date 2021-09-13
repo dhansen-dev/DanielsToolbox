@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace DanielsToolbox.Models
 {
@@ -13,6 +14,8 @@ namespace DanielsToolbox.Models
         public int Order { get; set; }
         public string Path { get; set; }
         public string RemoteUrl { get; set; }
+
+        public string ETag {  get; set; }
 
         public List<WikiPage> SubPages { get; set; } = new List<WikiPage>();
 

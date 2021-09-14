@@ -117,9 +117,20 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
                     query.AddOrder("createdon", OrderType.Descending);
 
-                    var actualImportJob = client.RetrieveMultiple(query).Entities.First();
+                    EntityCollection queryResult = null;
 
-                    return actualImportJob.Id;
+                    do
+                    {
+                        Thread.Sleep(5000);
+
+                        queryResult = client.RetrieveMultiple(query);
+
+                    } while(!queryResult.Entities.Any());
+
+                    // Assume that we only have one result. 
+                    var importJobEntity = queryResult.Entities.Single();
+
+                    return importJobEntity.Id;
                 }
             }
         }

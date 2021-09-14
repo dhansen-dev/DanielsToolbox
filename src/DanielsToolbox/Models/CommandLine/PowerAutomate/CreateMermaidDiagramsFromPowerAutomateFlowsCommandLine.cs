@@ -185,9 +185,6 @@ namespace DanielsToolbox.Models.CommandLine.PowerAutomate
 			{
 				graph.AppendLine(FormatKey(key) + "-->|" + text + "|" + FormatKey(runafters.Key));
 			}
-
-
-
 		}
 
         private void FindChildren(Dictionary<string, FlowAction> children, Dictionary<string, FlowAction> list)
@@ -224,9 +221,7 @@ namespace DanielsToolbox.Models.CommandLine.PowerAutomate
 		{
 			public string Type { get; set; }
 			public string Kind { get; set; }
-			//public Dictionary<string, string> Inputs = new Dictionary<string, string>();
-			//public Dictionary<string, string> Conditions = new Dictionary<string, string>();
-		}
+			}
 
 		public class CaseDTO
 		{

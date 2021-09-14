@@ -33,7 +33,6 @@ namespace DanielsToolbox.Models.CommandLine.PowerAutomate
 		   new Argument<string>("solution-name", "Solution name (unique name)"),
 		   new Option<string>("--output", "Filetype of the output").FromAmong("png", "svg", "pdf")		   
 		 };
-        
 
         public static Command Create()
         {
@@ -43,19 +42,25 @@ namespace DanielsToolbox.Models.CommandLine.PowerAutomate
                 Arguments()
             };
 
-            command.Handler = CommandHandler.Create<CreateMermaidDiagramsFromPowerAutomateFlowsCommandLine>(handler => handler.CreateDiagrams());
+            command.Handler = CommandHandler.Create<CreateMermaidDiagramsFromPowerAutomateFlowsCommandLine>(async handler => await handler.CreateDiagrams());
 
             return command;
         }
 
-        private void CreateDiagrams()
+        private async Task CreateDiagrams()
         {
             var client = DataverseServicePrincipal.Connect();
 
+			Console.WriteLine("Flows from " + SolutionName + " will be used");
+			Console.WriteLine("Mermaid diagrams will be stored at " + OutputDir.FullName);
+			Console.WriteLine("Selected output format: " + Output);
+
 			Directory.CreateDirectory(OutputDir.FullName);
 
-            foreach(var flow in QueryHelper.GetModernWorkFlows(client, SolutionName))
+            foreach(var flow in QueryHelper.GetModernWorkFlowsFromSolution(client, SolutionName))
             {
+				Console.WriteLine("Creating diagram for " + flow.Name);
+
 				JObject json = (JObject)JsonConvert.DeserializeObject(flow.ClientData);
 
 				var triggers = json.SelectToken("properties.definition.triggers");
@@ -86,22 +91,23 @@ namespace DanielsToolbox.Models.CommandLine.PowerAutomate
 
 				GenerateFlowChart(actionsObject, list, graph);
 
-				var imagePath = Path.GetTempFileName();
+				var inputPath = Path.GetTempFileName();				
 
-				Console.WriteLine(Path.GetTempFileName());
+				File.WriteAllText(inputPath, graph.ToString());
 
-				File.WriteAllText(imagePath, graph.ToString());
+				var outputFile = $"{Path.Combine(OutputDir.FullName, flow.Name)}.{Output}";
 
-				var outputFile = Path.Combine(OutputDir.FullName, flow.Name);
+				Console.WriteLine("Generating diagram");
 
-				Process.Start(new ProcessStartInfo("mmdc", $"-i \"{imagePath}\" -o \"{outputFile}.{Output}\" -w 2540 -H 1440 -b transparent")
+				var mermaidProcess = Process.Start(new ProcessStartInfo("mmdc", $"-i \"{inputPath}\" -o \"{outputFile}\" -w 2540 -H 1440 -b transparent")
 				{
 					UseShellExecute = true,
-					CreateNoWindow = true
+					WindowStyle = ProcessWindowStyle.Hidden
 				});
 
-				
+				await mermaidProcess.WaitForExitAsync();
 
+				Console.WriteLine("Diagram generated");
 			}
         }
 

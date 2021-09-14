@@ -12,7 +12,7 @@ namespace DanielsToolbox.Helpers
 {
     public class QueryHelper
     {
-        public static List<Workflow> GetModernWorkFlows(ServiceClient client, string solutionName)
+        public static List<Workflow> GetModernWorkFlowsFromSolution(ServiceClient client, string solutionName)
         {
             var context = new OrganizationServiceContext(client);
 

@@ -37,7 +37,7 @@ namespace DanielsToolbox.Models.CommandLine.PowerAutomate
             var client = DataverseServicePrincipalCommandLine.Connect();
 
             var inactiveFlows = QueryHelper
-                                    .GetModernWorkFlows(client, SolutionName)
+                                    .GetModernWorkFlowsFromSolution(client, SolutionName)
                                     .Where(w => w.StateCode == 0 && w.StatusCode == 1)
                                     .OrderByDescending(w => w.CreatedOn);
 

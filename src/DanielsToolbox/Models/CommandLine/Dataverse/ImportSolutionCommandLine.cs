@@ -123,7 +123,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             var asyncOpEntity = client.Retrieve("asyncoperation", asyncOperationId, new ColumnSet(true));
 
-            var asyncOperation = new AsyncOperation(asyncOpEntity);
+            var asyncOperation = asyncOpEntity.ToEntity<AsyncOperation>();
 
             if (asyncOperation.StatusCode != AsyncOperation.AsyncOperationStatusCode.Succeeded)
             {
@@ -141,7 +141,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             {
                 asyncOperationEntity = client.Retrieve("asyncoperation", asyncOperationId, new ColumnSet(true));
 
-                asyncOperation = new AsyncOperation(asyncOperationEntity);
+                asyncOperation = asyncOperationEntity.ToEntity<AsyncOperation>();
 
                 Thread.Sleep(1500);
             } while (tries++ < 10 && !asyncOperation?.HasStarted() == false);

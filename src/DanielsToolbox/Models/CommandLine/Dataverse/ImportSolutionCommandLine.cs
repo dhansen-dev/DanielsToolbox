@@ -15,6 +15,9 @@ using DanielsToolbox.Extensions;
 using System.CommandLine.Invocation;
 using ShellProgressBar;
 using System.Runtime.CompilerServices;
+using System.Xml.Linq;
+using System.IO.Compression;
+using System.Xml.XPath;
 
 namespace DanielsToolbox.Models.CommandLine.Dataverse
 {
@@ -57,6 +60,8 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             WaitForAsyncOperationToStart(asyncOperationId, client);
 
+            importJobId = FindRealImportJobId(solutionZipPath, client);
+
             var options = new ProgressBarOptions
             {
 
@@ -79,6 +84,43 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
                 pbar.Tick(100 * 100);
 
+            }
+        }
+
+        /// <summary>
+        /// For some reason we do not get the actual import job id any more, so we query for it
+        /// instead
+        /// </summary>
+        /// <param name="solutionZipPath">The solution zip path so we can extract the solution name</param>
+        /// <param name="client">CRM Service client</param>
+        /// <returns>The actual import job id</returns>
+        private static Guid FindRealImportJobId(string solutionZipPath, ServiceClient client)
+        {
+            using (var zip = ZipFile.OpenRead(solutionZipPath))
+            {
+                var solutionXML = zip.Entries.Where(e => e.Name == "solution.xml").Single();
+
+                using (var solutionXMLStream = solutionXML.Open())
+                {
+                    var xdoc = XDocument.Load(solutionXMLStream);
+
+                    var solutionName = xdoc.Root.XPathSelectElement("SolutionManifest/UniqueName").Value;
+
+                    var query = new QueryExpression("importjob")
+                    {
+                        ColumnSet = new ColumnSet(true),
+                        NoLock = true
+                    };
+
+                    query.Criteria.AddCondition("solutionname", ConditionOperator.Equal, solutionName);
+                    query.Criteria.AddCondition("completedon", ConditionOperator.Null);
+
+                    query.AddOrder("createdon", OrderType.Descending);
+
+                    var actualImportJob = client.RetrieveMultiple(query).Entities.First();
+
+                    return actualImportJob.Id;
+                }
             }
         }
 
@@ -144,7 +186,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                 asyncOperation = asyncOperationEntity.ToEntity<AsyncOperation>();
 
                 Thread.Sleep(1500);
-            } while (tries++ < 10 && !asyncOperation?.HasStarted() == false);
+            } while (tries++ < 10 && asyncOperation?.HasStarted() == false);
         }
 
         public void Import(FileInfo pathToZipFile)

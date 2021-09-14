@@ -11,6 +11,8 @@ using DanielsToolbox.Extensions;
 using System.CommandLine.Invocation;
 using System.Threading.Tasks;
 using System.Linq;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace DanielsToolbox.Models.CommandLine.Dataverse
 {
@@ -50,28 +52,53 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             var timer = Stopwatch.StartNew();
 
-            var exportSolutionResponseTask = client.ExecuteAsync(new ExportSolutionRequest
+            var asyncExport = await client.ExecuteAsync(new OrganizationRequest("ExportSolutionAsync")
             {
-                SolutionName = SolutionName,
-                Managed = false
+                Parameters = new ParameterCollection
+                {
+                    {  "SolutionName", SolutionName },
+                    {  "Managed", false }
+                }                
             });
+
+            var exportAsyncOperationId = Guid.Parse(asyncExport["AsyncOperationId"].ToString());
+            var exportJobId = Guid.Parse(asyncExport["ExportJobId"].ToString());
+
+            var asyncExportOperation = (await client.RetrieveAsync("asyncoperation", exportAsyncOperationId, new ColumnSet(true))).ToEntity<AsyncOperation>();
 
             int count = 1;
 
-            while(!exportSolutionResponseTask.IsCompleted)
+            
+
+            while(!asyncExportOperation.IsCompleted())
             {              
-                await Task.Delay(5000);
+                await Task.Delay(10000);
 
                 Console.WriteLine(new string('.', count++));
+
+                asyncExportOperation = (await client.RetrieveAsync("asyncoperation", exportAsyncOperationId, new ColumnSet(true))).ToEntity<AsyncOperation>();
             }
 
-            var exportSolutionResponse = (ExportSolutionResponse)(await exportSolutionResponseTask);
+            if(asyncExportOperation.StatusCode != AsyncOperation.AsyncOperationStatusCode.Succeeded)
+            {
+                throw new Exception("Export failed with message: " + asyncExportOperation.FriendlyMessage);
+            }
+
+            var exportDataResponse = await client.ExecuteAsync(new OrganizationRequest("DownloadSolutionExportData")
+            {
+                Parameters = new ParameterCollection
+                {
+                    { "ExportJobId", exportJobId }
+                }
+            });
+
+            var exportSolutionFile = (byte[])(exportDataResponse["ExportSolutionFile"]);
 
             Console.WriteLine($"Solution exported in {timer.Elapsed:c}");
 
-            File.WriteAllBytes(zipPath, exportSolutionResponse.ExportSolutionFile);
+            File.WriteAllBytes(zipPath, exportSolutionFile);
 
-            Console.WriteLine($"Solution was {Math.Round(exportSolutionResponse.ExportSolutionFile.Length / 1000.0, 2)} kilobytes and saved to " + zipPath);
+            Console.WriteLine($"Solution was {Math.Round(exportSolutionFile.Length / 1000.0, 2)} kilobytes and saved to " + zipPath);
 
             return zipPath;
         }

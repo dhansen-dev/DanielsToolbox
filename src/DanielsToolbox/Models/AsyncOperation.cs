@@ -1,17 +1,16 @@
 ﻿
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Client;
 
 using System;
 
 namespace DanielsToolbox.Models
 {
-    public class AsyncOperation
+    [EntityLogicalNameAttribute("asyncoperation")]
+    public class AsyncOperation : Entity
     {
-        private readonly Entity _entity;
-
-        public AsyncOperation(Entity entity)
+        public AsyncOperation() : base("asyncoperation")
         {
-            _entity = entity;
         }
 
         public enum AsyncOperationStatusCode
@@ -26,11 +25,19 @@ namespace DanielsToolbox.Models
             Canceled = 32
         }
 
-        public TimeSpan ExecutionTimeSpan { get => TimeSpan.FromMinutes(_entity.GetAttributeValue<double>("executiontimespan")); }
-        public string FriendlyMessage { get => _entity.GetAttributeValue<string>("friendlymessage"); }
-        public Guid Id { get => _entity.GetAttributeValue<Guid>("asyncoperationid"); }
+        public enum AsyncOperationStateCode
+        {
+            Ready = 0,
+            InProgess = 1,
+            Locked = 2,
+            Completed = 3
+        };
 
-        public AsyncOperationStatusCode StatusCode { get => (AsyncOperationStatusCode)_entity.GetAttributeValue<OptionSetValue>("statuscode")?.Value; }
+        public TimeSpan ExecutionTimeSpan { get => TimeSpan.FromMinutes(GetAttributeValue<double>("executiontimespan")); }
+        public string FriendlyMessage { get => GetAttributeValue<string>("friendlymessage"); }        
+
+        public AsyncOperationStatusCode StatusCode { get => (AsyncOperationStatusCode)GetAttributeValue<OptionSetValue>("statuscode")?.Value; }
+        public AsyncOperationStateCode StateCode { get => (AsyncOperationStateCode)GetAttributeValue<OptionSetValue>("statecode")?.Value; }
 
         public bool HasStarted()
             => !(StatusCode == AsyncOperationStatusCode.WaitingForResources || StatusCode == AsyncOperationStatusCode.Waiting);

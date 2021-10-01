@@ -40,6 +40,9 @@ namespace DanielsToolbox.Managers
         {
             var o = client;
 
+            var solutionId = (await GetExistingEntityId(client, "solution", new ConditionExpression("uniquename", ConditionOperator.Equal, commandLine.SolutionName))).Value;
+
+
             Guid pluginAssemblyId;
 
             var existingPluginAssemblyId = await GetExistingEntityId(o, "pluginassembly", new ConditionExpression("name", ConditionOperator.Equal, pluginAssembly.Name));
@@ -59,8 +62,10 @@ namespace DanielsToolbox.Managers
                 Console.WriteLine("Creating plugin assembly " + pluginAssembly.Name);
                 pluginAssemblyId = o.Create(entity);
 
-                await AddSolutionComponent(o, pluginAssemblyId, 91, commandLine.SolutionName);
             }
+
+            await EnsureSolutionComponentIsInSolution(o, pluginAssemblyId, 91, commandLine.SolutionName, solutionId);
+
 
             Console.WriteLine("Done with plugin assembly");
 
@@ -70,7 +75,7 @@ namespace DanielsToolbox.Managers
                 {
                     Console.WriteLine("Registering plugin " + plugin.TypeName);
 
-                    await RegisterPluginSteps(client, commandLine.SolutionName, pluginAssemblyId, plugin);
+                    await RegisterPluginSteps(client, commandLine.SolutionName, pluginAssemblyId, plugin, solutionId);
                 }
             }
             else
@@ -110,17 +115,19 @@ namespace DanielsToolbox.Managers
 
                     if (stepDiff.Any())
                     {
-                        foreach (var removedStep in stepDiff)
+                        foreach (var removedStepId in stepDiff)
                         {
-                            if (GetAliasedValue<BooleanManagedProperty>(remotePluginSteps[removedStep], "step.iscustomizable").Value)
+                            if (GetAliasedValue<BooleanManagedProperty>(remotePluginSteps[removedStepId], "step.iscustomizable").Value)
                             {
-                                Console.WriteLine("Will remove step " + removedStep);
+                                Console.WriteLine("Removing step " + removedStepId);
+
+                                await client.DeleteAsync("sdkmessageprocessingstep", removedStepId);
                             }
                         }
-                    } 
+                    }
                     else
                     {
-                        foreach(var remotePluginStep in remotePluginSteps)
+                        foreach (var remotePluginStep in remotePluginSteps)
                         {
                             var remoteImageQuery = new QueryExpression("sdkmessageprocessingstepimage")
                             {
@@ -136,25 +143,29 @@ namespace DanielsToolbox.Managers
 
                             var imageDiffs = remoteImages.Except(localImages);
 
-                            foreach(var imageDiff in imageDiffs)
+                            foreach (var removedImageId in imageDiffs)
                             {
-                                var remoteImageIdToDelete = remoteImageEntities.Single(remoteImage => remoteImage.GetAttributeValue<OptionSetValue>("imagetype").Value == imageDiff);
+                                var remoteImageIdToDelete = remoteImageEntities.Single(remoteImage => remoteImage.GetAttributeValue<OptionSetValue>("imagetype").Value == removedImageId);
 
                                 Console.WriteLine("Deleting image " + remoteImageIdToDelete);
+
+                                await client.DeleteAsync("sdkmessageprocessingstepimage", remoteImageIdToDelete.Id);
                             }
                         }
                     }
-                } 
+                }
                 else
                 {
                     Console.WriteLine("Will remove plugin type " + remotePluginType.Key);
+
+                    await client.DeleteAsync("plugintype", remotePluginType.Key);
                 }
             }
         }
 
-        public static async Task RegisterPluginSteps(ServiceClient client, string solutionName, Guid pluginAssemblyId, Plugin plugin)
-        {           
-
+        public static async Task RegisterPluginSteps(ServiceClient client, string solutionName, Guid pluginAssemblyId, Plugin plugin, Guid solutionId)
+        {
+            
             var lengthOfDescription = plugin.ExtensionDescription?.Length > 256 ? 256 : (plugin.ExtensionDescription?.Length ?? 0);
 
             var pluginTypeEntity = new Entity("plugintype")
@@ -250,32 +261,46 @@ namespace DanielsToolbox.Managers
                 else
                 {
                     stepId = await client.CreateAsync(stepToCreate);
-                    await AddSolutionComponent(client, stepId, 92, solutionName);
                 }
+
+                await EnsureSolutionComponentIsInSolution(client, stepId, 92, solutionName, solutionId);
 
                 await RegisterPluginImages(client, step, stepId);
             }
         }
 
-        public static async Task AddSolutionComponent(ServiceClient client, Guid componentId, int componentType, string solutionName)
+        public static async Task EnsureSolutionComponentIsInSolution(ServiceClient client, Guid componentId, int componentType, string solutionName, Guid? solutionId)
         {
             if(solutionName == null)
             {
                 await Task.CompletedTask;
             }
 
-            await client.ExecuteAsync(new OrganizationRequest("AddSolutionComponent")
+            var existingComponent = await GetExistingEntityId(client, "solutioncomponent",
+                                        new ConditionExpression("solutionid", ConditionOperator.Equal, solutionId),
+                                        new ConditionExpression("objectid", ConditionOperator.Equal, componentId));
+
+            if(!existingComponent.HasValue)
             {
-                Parameters = new ParameterCollection
+                Console.WriteLine("Adding component to solution");
+
+                await client.ExecuteAsync(new OrganizationRequest("AddSolutionComponent")
                 {
-                    { "ComponentId", componentId },
-                    { "ComponentType", componentType },
-                    { "SolutionUniqueName", solutionName },
-                    { "AddRequiredComponents", false },
-                    { "DoNotIncludeSubcomponents", false }
-                }
-            });
+                    Parameters = new ParameterCollection
+                    {
+                        { "ComponentId", componentId },
+                        { "ComponentType", componentType },
+                        { "SolutionUniqueName", solutionName },
+                        { "AddRequiredComponents", true },
+                        { "DoNotIncludeSubcomponents", false }
+                    }
+                });
+            } 
         }
+
+        
+
+        
 
         public static Entity CreatePluginAssembly(byte[] assembly, string assemblyName, Version version)
         {

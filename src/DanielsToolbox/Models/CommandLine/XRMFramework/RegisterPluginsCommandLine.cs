@@ -29,7 +29,7 @@ namespace DanielsToolbox.Models.CommandLine.XRMFramework
                 new Argument<FileInfo>("pluginassemblypath", "Path to plugin assembly").ExistingOnly(),
                 new Option<bool>("--update-only-plugin-assembly", "Only update assembly"),
                 new Option<string>("--solution-name", "Will add assembly and related data to named solution"),
-                new Option<bool>("--sync-plugin-steps", () => true, "Will sync remote plugin steps with local")
+                new Option<bool>("--sync-plugin-steps", () => false, "Will sync remote plugin steps with local")
             };
 
         public static Command Create()

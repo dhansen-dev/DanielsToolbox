@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 using System.Xml.Serialization;
 
 using DanielsToolbox.Extensions;
@@ -215,17 +216,31 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             public string ToPublishXML()
             {
-                XmlSerializer x = new(typeof(ImportExportXML));
-
-                var ms = new MemoryStream();
-                
-                x.Serialize(ms, this);
-                
-                var publishXml = Encoding.UTF8.GetString(ms.ToArray());
+                var publishXml = SerializeToString(this);
 
                 return publishXml;
             }
-        }
+
+            private static string SerializeToString<T>(T value)
+            {
+                var emptyNamespaces = new XmlSerializerNamespaces(new[] { XmlQualifiedName.Empty });
+                var serializer = new XmlSerializer(value.GetType());
+                var settings = new XmlWriterSettings
+                {
+                    Indent = true,
+                    OmitXmlDeclaration = true
+                };
+
+                using (var stream = new StringWriter())
+                {
+                    using (var writer = XmlWriter.Create(stream, settings))
+                    {
+                        serializer.Serialize(writer, value, emptyNamespaces);
+                        return stream.ToString();
+                    }
+                }
+            }
+            }
 
         public class Webresource
         {

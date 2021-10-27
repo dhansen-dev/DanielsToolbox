@@ -40,7 +40,7 @@ namespace DanielToolbox.Core
 
         private static async Task DownloadSdkFiles(HttpClient client)
         {
-            var sdkPackage = await client.GetByteArrayAsync("https://www.nuget.org/api/v2/package/microsoft.crmsdk.coreassemblies/9.0.2.41");
+            var sdkPackage = await client.GetByteArrayAsync("https://www.nuget.org/api/v2/package/microsoft.crmsdk.coreassemblies/9.0.2.42");
 
             Console.WriteLine("Package downloaded");
 
@@ -56,7 +56,7 @@ namespace DanielToolbox.Core
 
         private static async Task DownloadSolutionPackagerFiles(HttpClient client)
         {
-            var toolPackage = await client.GetByteArrayAsync("https://www.nuget.org/api/v2/package/Microsoft.CrmSdk.CoreTools/9.1.0.79");
+            var toolPackage = await client.GetByteArrayAsync("https://www.nuget.org/api/v2/package/Microsoft.CrmSdk.CoreTools/9.1.0.90");
 
             Console.WriteLine("Package downloaded");
 

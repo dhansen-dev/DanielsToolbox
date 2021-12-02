@@ -63,8 +63,10 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             return command;
         }
 
-        public void RunSolutionPackager()
+        public void RunSolutionPackager(string zipPath = null)
         {
+            _arguments.PathToZipFile ??= zipPath;
+
             _arguments.DisableTelemetry = true;
 
             var defaultTelemetryConfiguration = TelemetryConfiguration.CreateDefault();
@@ -78,19 +80,24 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             if (_arguments.Action == CommandAction.Extract)
             {
-                foreach (var flowDefinition in new DirectoryInfo(Path.Combine(_arguments.Folder, "Workflows/")).GetFiles("*.json"))
+                var workflowDirectory = new DirectoryInfo(Path.Combine(_arguments.Folder, "Workflows/"));
+
+                if (workflowDirectory.Exists)
                 {
-                    var doc = JsonDocument.Parse(File.ReadAllText(flowDefinition.FullName));
-
-                    using Stream flowDefinitionStreamWriter = new FileStream(flowDefinition.FullName, FileMode.OpenOrCreate);
-                    var utf8MemoryWriter = new Utf8JsonWriter(flowDefinitionStreamWriter, new JsonWriterOptions
+                    foreach (var flowDefinition in workflowDirectory.GetFiles("*.json"))
                     {
-                        Indented = true
-                    });
+                        var doc = JsonDocument.Parse(File.ReadAllText(flowDefinition.FullName));
 
-                    doc.WriteTo(utf8MemoryWriter);
+                        using Stream flowDefinitionStreamWriter = new FileStream(flowDefinition.FullName, FileMode.OpenOrCreate);
+                        var utf8MemoryWriter = new Utf8JsonWriter(flowDefinitionStreamWriter, new JsonWriterOptions
+                        {
+                            Indented = true
+                        });
 
-                    utf8MemoryWriter.Flush();
+                        doc.WriteTo(utf8MemoryWriter);
+
+                        utf8MemoryWriter.Flush();
+                    }
                 }
             }
             Console.WriteLine("Solution packager executed successfully");

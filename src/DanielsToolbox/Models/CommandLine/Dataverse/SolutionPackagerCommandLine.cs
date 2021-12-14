@@ -72,9 +72,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             var defaultTelemetryConfiguration = TelemetryConfiguration.CreateDefault();
             defaultTelemetryConfiguration.DisableTelemetry = true;
 
-            var telemetryClient = new AppTelemetryClient(defaultTelemetryConfiguration);
-
-            var packager = new SolutionPackager(_arguments, telemetryClient);
+            var packager = new SolutionPackager(_arguments);
             
             packager.Run();
 

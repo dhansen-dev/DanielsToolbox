@@ -18,6 +18,7 @@ using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using System.IO.Compression;
 using System.Xml.XPath;
+using System.ComponentModel;
 
 namespace DanielsToolbox.Models.CommandLine.Dataverse
 {
@@ -52,6 +53,17 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         public static void ImportAsyncAndWaitWithProgress(ServiceClient client, string solutionZipPath, bool publishChanges, bool displayProgressBar)
         {
+            
+
+            Console.WriteLine("Reading archive " + solutionZipPath);
+
+            using(var zip = ZipFile.OpenRead(solutionZipPath))
+            {
+                var solutionXML = XDocument.Load(zip.GetEntry("solution.xml").Open());
+
+                Console.WriteLine("Importing version " + solutionXML.XPathSelectElement("ImportExportXml/SolutionManifest/Version").Value);
+                
+            }
             var asyncOperationId = client.ImportSolutionAsync(solutionZipPath, out Guid importJobId);
 
             Console.WriteLine($"Async solution import requested. Async id: {asyncOperationId}, Import job id: {importJobId}");

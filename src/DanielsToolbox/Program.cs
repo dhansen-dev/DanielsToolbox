@@ -34,6 +34,7 @@ namespace PowerPlatformCLI
                 new Command("xrmframework", "Tools related to XRMFramework")
                 {
                     RegisterPluginsCommandLine.Create(),
+                    
                     DocumentPluginsCommandLine.Create()
                 }
             }.InvokeAsync(args);

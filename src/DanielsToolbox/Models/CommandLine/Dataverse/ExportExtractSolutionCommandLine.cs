@@ -30,9 +30,9 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         public async Task ExportExtract()
         {
-            await ExportSolutionCommandLine.ExportSolution(PathToZipFile);
+            var zipPath = await ExportSolutionCommandLine.ExportSolution(PathToZipFile);
 
-            ExtractSolutionCommandLine.RunSolutionPackager();
+            ExtractSolutionCommandLine.RunSolutionPackager(zipPath);
         }
     }
 }

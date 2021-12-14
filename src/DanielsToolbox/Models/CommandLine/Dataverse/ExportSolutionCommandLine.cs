@@ -39,11 +39,10 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             return command;
         }
 
-        public async Task<string> ExportSolution()
-                    => await ExportSolution(new FileInfo(Path.GetTempFileName()));
-
-        public async Task<string> ExportSolution(FileInfo pathToSaveSolutionZip)
+        public async Task<string> ExportSolution(FileInfo pathToSaveSolutionZip = null)
         {
+            pathToSaveSolutionZip = pathToSaveSolutionZip ?? new FileInfo(Path.GetTempFileName());
+
             ServiceClient client = DataverseServicePrincipalCommandLine.Connect();
 
             var zipPath = pathToSaveSolutionZip.FullName;

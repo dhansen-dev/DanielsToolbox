@@ -35,7 +35,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             {
                 new Option<FileInfo>("--path-to-zip-file"),
                 new Option<bool>("--display-progress-bar"),
-                new Option<bool>("--publish-changes", getDefaultValue: () => true)
+                new Option<bool>("--publish-all", getDefaultValue: () => true)
             };
 
         public static Command Create()

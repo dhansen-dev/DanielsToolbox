@@ -24,11 +24,6 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             };
 
-            var ett = SymbolEqualityComparer.Create;
-            var två = SymbolEqualityComparer.Create;
-
-
-
             command.Handler = CommandHandler.Create<PackImportSolutionCommandLine>(a => a.PackImport());
 
             return command;

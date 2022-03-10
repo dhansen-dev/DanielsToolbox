@@ -16,7 +16,8 @@ namespace PowerPlatformCLI
                 new Command("power-automate")
                 {
                     ActivateModernFlowsCommandLine.Create(),
-                    CreateMermaidDiagramsFromPowerAutomateFlowsCommandLine.Create()
+                    CreateMermaidDiagramsFromPowerAutomateFlowsCommandLine.Create(),
+                    RemoveFlowsNoLongerInSolutionCommandLine.Create(),  
                 },
                 new Command("dataverse")
                 {

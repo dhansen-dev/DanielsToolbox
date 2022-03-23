@@ -248,7 +248,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
         {
             if(PrintDevopsProgress)
             {                
-                Console.WriteLine($"##vso[task.setprogress value={currentProgress};]{currentProcess}");
+                Console.WriteLine($"##vso[task.setprogress value={(int)currentProgress};]{currentProcess}");
                 
 
                 if(currentProgress >= 100)

@@ -55,10 +55,6 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         public string SolutionName { get; init;  }
 
-        public string SearchPattern { get; init;  }
-
-        public bool Publish { get; init; }
-
         public bool IncludeWebResources { get; init; }
 
         public bool IncludeConnectionReferences { get; init; }
@@ -70,8 +66,6 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
          {
              new Argument<string>("solutionName", "Name of solution containing webresources"),
              new Option<FileInfo>("--solution-file", "Path to solution containing web resources").ExistingOnly(),
-             new Option<string>("--search-pattern", () => "*.*"),
-             new Option<bool>("--publish", () => true, "Publish updated webresources"),
              new Option<Uri>("--source-environment-uri"),
              new Option<bool>("--use-source-environment"),
              new Option<bool>("--include-web-resources", () => true),

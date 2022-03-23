@@ -246,17 +246,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         private void PrintProgress(ProgressBar progressBar, string message, double currentProgress, string currentProcess)
         {
-            if(PrintDevopsProgress)
-            {                
-                Console.WriteLine($"##vso[task.setprogress value={(int)currentProgress};]{currentProcess}");
-                
-
-                if(currentProgress >= 100)
-                {
-                    Console.WriteLine($"##vso[task.complete result=Succeeded;]DONE");
-                }
-            } 
-            else if(DisplayProgressBar)
+            if(DisplayProgressBar)
             {
                 progressBar?.WriteLine(message);
 
@@ -265,6 +255,16 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             }
             else
             {
+                if (PrintDevopsProgress)
+                {
+                    Console.WriteLine($"##vso[task.setprogress value={(int)currentProgress};]{currentProcess}");
+
+                    if (currentProgress >= 100)
+                    {
+                        Console.WriteLine($"##vso[task.complete result=Succeeded;]DONE");
+                    }
+                }
+                
                 Console.WriteLine(message);
             }
         }

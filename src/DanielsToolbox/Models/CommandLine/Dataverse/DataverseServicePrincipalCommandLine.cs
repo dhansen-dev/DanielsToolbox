@@ -18,8 +18,11 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         public Guid? ImpersonateUser { get; init; }
 
+        public ServiceClient ConnectTo(Uri instanceUri)
+            => ServiceClientManager.CreateClient(instanceUri, ClientId, ClientSecret, ConnectionTimeout, ImpersonateUser);
+
         public ServiceClient Connect()
-            => ServiceClientManager.CreateClient(InstanceUri, ClientId, ClientSecret, ConnectionTimeout, ImpersonateUser);
+            => ConnectTo(InstanceUri);
 
         public static IEnumerable<Symbol> Arguments()
                         => new Symbol[] {

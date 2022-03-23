@@ -17,7 +17,6 @@ namespace PowerPlatformCLI
                 {
                     ActivateModernFlowsCommandLine.Create(),
                     CreateMermaidDiagramsFromPowerAutomateFlowsCommandLine.Create(),
-                    RemoveFlowsNoLongerInSolutionCommandLine.Create(),  
                 },
                 new Command("dataverse")
                 {
@@ -27,7 +26,8 @@ namespace PowerPlatformCLI
                     PackImportSolutionCommandLine.Create(),
                     ExportExtractSolutionCommandLine.Create(),
                     SynchronizeWebResourcesCommandLine.Create(),
-                    PublishAllCommandLine.Create()
+                    PublishAllCommandLine.Create(),
+                    RemovedDeletedSolutionItemsCommandLine.Create()
                 },
                 new Command("azure-devops")
                 {

@@ -28,6 +28,8 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         public bool DisplayProgressBar { get; init; }
 
+        public bool PrintDevopsProgress { get; init; }
+
         public bool PublishChanges { get; init; }
         public FileInfo PathToZipFile { get; init; }
         public static IEnumerable<Symbol> Arguments()
@@ -35,6 +37,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             {
                 new Option<FileInfo>("--path-to-zip-file"),
                 new Option<bool>("--display-progress-bar"),
+                new Option<bool>("--print-devops-progress"),
                 new Option<bool>("--publish-all", getDefaultValue: () => true)
             };
 
@@ -51,7 +54,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             return command;
         }
 
-        public static void ImportAsyncAndWaitWithProgress(ServiceClient client, string solutionZipPath, bool publishChanges, bool displayProgressBar)
+        public void ImportAsyncAndWaitWithProgress(ServiceClient client, string solutionZipPath, bool publishChanges, bool displayProgressBar)
         {
             
 
@@ -81,17 +84,17 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             using (var pbar = new ProgressBar(100 * 100, "Importing solution", options))
             {
-                WaitForAsyncOperationToComplete(importJobId, asyncOperationId, client, pbar, displayProgressBar);
+                WaitForAsyncOperationToComplete(importJobId, asyncOperationId, client, pbar);
 
-                PrintProgress(displayProgressBar, pbar, "Changes successfully imported");
+                PrintProgress(pbar, "Changes successfully imported", 1, "Solution Import");
 
                 if (publishChanges)
                 {
-                    PrintProgress(displayProgressBar, pbar, "Publishing changes!");
+                    PrintProgress(pbar, "Publishing changes!", 0, "Publishing");
 
                     client.Execute(new PublishAllXmlRequest());
 
-                    PrintProgress(displayProgressBar, pbar, "Changes successfully published!");
+                    PrintProgress(pbar, "Changes successfully published!", 1, "Publishing");
                 }
 
                 pbar.Tick(100 * 100);
@@ -147,7 +150,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             }
         }
 
-        public static void WaitForAsyncOperationToComplete(Guid importJobId, Guid asyncOperationId, ServiceClient client, ProgressBar pbar, bool displayProgressBar)
+        public void WaitForAsyncOperationToComplete(Guid importJobId, Guid asyncOperationId, ServiceClient client, ProgressBar progressBar)
         {
             ImportJob importJob = null;
             Entity importJobEntity;
@@ -169,9 +172,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
                     var currentProgress = Math.Round(importJob.Progress, 2);
 
-                    PrintProgress(displayProgressBar, pbar, $"{currentProgress}%");
-
-                    pbar.Tick((int)currentProgress * 100);
+                    PrintProgress(progressBar, $"{currentProgress}%", currentProgress, "Solution Import");
 
                     if (importJob.IsCompleted() == false)
                     {
@@ -243,11 +244,29 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             }
         }
 
-        private static void PrintProgress(bool displayProgressBar, ProgressBar progressBar, string message)
+        private void PrintProgress(ProgressBar progressBar, string message, double currentProgress, string currentProcess)
         {
-            Action<string> printer = displayProgressBar ? progressBar.WriteLine : Console.WriteLine;
+            if(PrintDevopsProgress)
+            {                
+                Console.WriteLine($"##vso[task.setprogress value={currentProgress};]{currentProcess}");
+                
 
-            printer(message);
+                if(currentProgress >= 100)
+                {
+                    Console.WriteLine($"##vso[task.complete result=Succeeded;]DONE");
+                }
+            } 
+            else if(DisplayProgressBar)
+            {
+                progressBar?.WriteLine(message);
+
+                progressBar?.Tick((int)currentProgress * 100);
+
+            }
+            else
+            {
+                Console.WriteLine(message);
+            }
         }
     }
 }

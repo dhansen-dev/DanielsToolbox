@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 using DanielsToolbox.Extensions;
 
 using Microsoft.Crm.Sdk.Messages;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Client;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace DanielsToolbox.Models.CommandLine.Dataverse
 {
@@ -34,22 +37,41 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
         {
             var client = DataverseServicePrincipal.Connect();
 
+            var context = new OrganizationServiceContext(client.Clone());
+
             Console.WriteLine("Publishing all changes");
+
+            var startDate = DateTime.Now;
 
             var publishTask = client.ExecuteAsync(new PublishAllXmlRequest());
 
-            var watch = Stopwatch.StartNew(); 
+            await Task.Delay(1000);
 
-            while(!publishTask.IsCompleted)
+            var publishAllRecord = context.CreateQuery("msdyn_solutionhistory")
+                                .Where(x => x.GetAttributeValue<string>("msdyn_name") == "PublishAll")
+                                .OrderByDescending(x => x.GetAttributeValue<DateTime>("msdyn_starttime"))
+                                .FirstOrDefault();
+
+            Entity publishAllEntity = null;
+
+            var pollingClient = client.Clone();
+
+            do
             {
+                publishAllEntity = await pollingClient.RetrieveAsync("msdyn_solutionhistory", publishAllRecord.GetAttributeValue<Guid>("msdyn_solutionhistoryid"), new ColumnSet(true));
+
+                Console.WriteLine($"PublishAll is still running");
+
                 await Task.Delay(5000);
 
-                Console.WriteLine($"Still waiting for publish to finish ({Math.Round(watch.Elapsed.TotalSeconds, 2)}s)");
+            } while (publishAllEntity.Contains("msdyn_result") == false);
+
+            if((publishAllEntity.GetAttributeValue<bool?>("msdyn_result") ?? false) == false)
+            {
+                throw new Exception(publishAllEntity.GetAttributeValue<string>("msdyn_exceptionmessage") + publishAllEntity.GetAttributeValue<string>("msdyn_exceptionstack"));
             }
 
-            await publishTask;
-
-            Console.WriteLine($"All changes published in {Math.Round(watch.Elapsed.TotalSeconds)}s");
+            Console.WriteLine($"Publish all successful in {publishAllEntity.GetAttributeValue<int>("msdyn_totaltime")}s");
         }
     }
 }

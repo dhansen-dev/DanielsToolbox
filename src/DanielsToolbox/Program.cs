@@ -31,7 +31,8 @@ namespace PowerPlatformCLI
                 },
                 new Command("azure-devops")
                 {
-                    CreatePullRequestCommandLine.Create()
+                    CreatePullRequestCommandLine.Create(),
+                    TransitionTasksCommandLine.Create()
                 },
                 new Command("xrmframework", "Tools related to XRMFramework")
                 {

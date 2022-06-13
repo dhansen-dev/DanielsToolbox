@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace DanielToolbox.Core
@@ -40,9 +41,11 @@ namespace DanielToolbox.Core
 
         private static async Task DownloadSdkFiles(HttpClient client)
         {
-            var sdkPackage = await client.GetByteArrayAsync("https://www.nuget.org/api/v2/package/microsoft.crmsdk.coreassemblies/9.0.2.42");
+            var coreAssembliesVersion = "9.0.2.42";
 
-            Console.WriteLine("Package downloaded");
+            var sdkPackage = await client.GetByteArrayAsync($"https://www.nuget.org/api/v2/package/microsoft.crmsdk.coreassemblies/{coreAssembliesVersion}");
+
+            Console.WriteLine($"Downloaded version {coreAssembliesVersion} of CoreAssemblies");
 
             using (var archive = new ZipArchive(new MemoryStream(sdkPackage)))
             {
@@ -56,9 +59,11 @@ namespace DanielToolbox.Core
 
         private static async Task DownloadSolutionPackagerFiles(HttpClient client)
         {
-            var toolPackage = await client.GetByteArrayAsync("https://www.nuget.org/api/v2/package/Microsoft.CrmSdk.CoreTools/9.1.0.111");
+            var coreToolsVersion = "9.1.0.111";
 
-            Console.WriteLine("Package downloaded");
+            var toolPackage = await client.GetByteArrayAsync($"https://www.nuget.org/api/v2/package/Microsoft.CrmSdk.CoreTools/{coreToolsVersion}");
+
+            Console.WriteLine($"Downloaded version {coreToolsVersion} of Core Tools");
 
             using (var archive = new ZipArchive(new MemoryStream(toolPackage)))
             {
@@ -75,12 +80,31 @@ namespace DanielToolbox.Core
         {
             Console.WriteLine("Saving " + filename);
 
+            var libFilePath = Path.Combine(LIB_PATH, filename);
+
             using (var entryStream = archive.GetEntry($"{path}{filename}").Open())
             {
+                var tempPath = Path.GetTempPath();
+                                
                 var memorystream = new MemoryStream();
+
                 await entryStream.CopyToAsync(memorystream);
 
-                File.WriteAllBytes(Path.Combine(LIB_PATH, filename), memorystream.ToArray());
+                var tempFile = Path.Combine(tempPath, filename);
+
+                await File.WriteAllBytesAsync(tempFile, memorystream.ToArray());
+
+                var nugetFileVersion = AssemblyName.GetAssemblyName(tempFile).Version;
+
+                var libFileExists = File.Exists(libFilePath);
+                
+                if (libFileExists == false || nugetFileVersion > AssemblyName.GetAssemblyName(libFilePath).Version)
+                {
+                    File.Move(tempFile, Path.Combine(LIB_PATH, filename));
+                } else
+                {
+                    File.Delete(tempFile);
+                }
             }
         }
     }

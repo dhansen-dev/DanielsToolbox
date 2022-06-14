@@ -82,7 +82,9 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             };
 
-            using (var pbar = new ProgressBar(100 * 100, "Importing solution", options))
+            ProgressBar pbar = DisplayProgressBar ? new ProgressBar(100 * 100, "Importing solution", options) : null;
+
+            using (pbar)
             {
                 WaitForAsyncOperationToComplete(importJobId, asyncOperationId, client, pbar);
 

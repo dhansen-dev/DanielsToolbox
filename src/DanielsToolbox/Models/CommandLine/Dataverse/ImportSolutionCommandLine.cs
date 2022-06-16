@@ -1,24 +1,23 @@
-﻿
+﻿using DanielsToolbox.Extensions;
+
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.PowerPlatform.Dataverse.Client;
+using Microsoft.PowerPlatform.Dataverse.Client.Extensions;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
+
+using ShellProgressBar;
 
 using System;
 using System.Collections.Generic;
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
-
-using DanielsToolbox.Extensions;
-using System.CommandLine.Invocation;
-using ShellProgressBar;
-using System.Runtime.CompilerServices;
 using System.Xml.Linq;
-using System.IO.Compression;
 using System.Xml.XPath;
-using System.ComponentModel;
 
 namespace DanielsToolbox.Models.CommandLine.Dataverse
 {
@@ -28,10 +27,11 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         public bool DisplayProgressBar { get; init; }
 
+        public FileInfo PathToZipFile { get; init; }
         public bool PrintDevopsProgress { get; init; }
 
         public bool PublishChanges { get; init; }
-        public FileInfo PathToZipFile { get; init; }
+
         public static IEnumerable<Symbol> Arguments()
             => new Symbol[]
             {
@@ -54,19 +54,43 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             return command;
         }
 
+        public static void WaitForAsyncOperationToStart(Guid asyncOperationId, ServiceClient client)
+        {
+            AsyncOperation asyncOperation = null;
+            Entity asyncOperationEntity;
+
+            int tries = 0;
+            do
+            {
+                asyncOperationEntity = client.Retrieve("asyncoperation", asyncOperationId, new ColumnSet(true));
+
+                asyncOperation = asyncOperationEntity.ToEntity<AsyncOperation>();
+
+                Thread.Sleep(1500);
+            } while (tries++ < 10 && asyncOperation?.HasStarted() == false);
+        }
+
+        public void Import(FileInfo pathToZipFile)
+        {
+            ServiceClient client = DataverseServicePrincipalCommandLine.Connect();
+
+            ImportAsyncAndWaitWithProgress(client, PathToZipFile.FullName, PublishChanges, DisplayProgressBar);
+        }
+
+        public void Import()
+            => Import(PathToZipFile);
+
         public void ImportAsyncAndWaitWithProgress(ServiceClient client, string solutionZipPath, bool publishChanges, bool displayProgressBar)
         {
-            
-
             Console.WriteLine("Reading archive " + solutionZipPath);
 
-            using(var zip = ZipFile.OpenRead(solutionZipPath))
+            using (var zip = ZipFile.OpenRead(solutionZipPath))
             {
                 var solutionXML = XDocument.Load(zip.GetEntry("solution.xml").Open());
 
                 Console.WriteLine("Importing version " + solutionXML.XPathSelectElement("ImportExportXml/SolutionManifest/Version").Value);
-                
             }
+
             var asyncOperationId = client.ImportSolutionAsync(solutionZipPath, out Guid importJobId);
 
             Console.WriteLine($"Async solution import requested. Async id: {asyncOperationId}, Import job id: {importJobId}");
@@ -79,7 +103,6 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
             var options = new ProgressBarOptions
             {
-
             };
 
             ProgressBar pbar = DisplayProgressBar ? new ProgressBar(100 * 100, "Importing solution", options) : null;
@@ -99,56 +122,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                     PrintProgress(pbar, "Changes successfully published!", 1, "Publishing");
                 }
 
-                pbar.Tick(100 * 100);
-
-            }
-        }
-
-        /// <summary>
-        /// For some reason we do not get the actual import job id any more, so we query for it
-        /// instead
-        /// </summary>
-        /// <param name="solutionZipPath">The solution zip path so we can extract the solution name</param>
-        /// <param name="client">CRM Service client</param>
-        /// <returns>The actual import job id</returns>
-        private static Guid FindRealImportJobId(string solutionZipPath, ServiceClient client)
-        {
-            using (var zip = ZipFile.OpenRead(solutionZipPath))
-            {
-                var solutionXML = zip.Entries.Where(e => e.Name == "solution.xml").Single();
-
-                using (var solutionXMLStream = solutionXML.Open())
-                {
-                    var xdoc = XDocument.Load(solutionXMLStream);
-
-                    var solutionName = xdoc.Root.XPathSelectElement("SolutionManifest/UniqueName").Value;
-
-                    var query = new QueryExpression("importjob")
-                    {
-                        ColumnSet = new ColumnSet(true),
-                        NoLock = true
-                    };
-
-                    query.Criteria.AddCondition("solutionname", ConditionOperator.Equal, solutionName);
-                    query.Criteria.AddCondition("completedon", ConditionOperator.Null);
-
-                    query.AddOrder("createdon", OrderType.Descending);
-
-                    EntityCollection queryResult = null;
-
-                    do
-                    {
-                        Thread.Sleep(5000);
-
-                        queryResult = client.RetrieveMultiple(query);
-
-                    } while(!queryResult.Entities.Any());
-
-                    // Assume that we only have one result. 
-                    var importJobEntity = queryResult.Entities.Single();
-
-                    return importJobEntity.Id;
-                }
+                pbar?.Tick(100 * 100);
             }
         }
 
@@ -199,31 +173,52 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
             }
         }
 
-        public static void WaitForAsyncOperationToStart(Guid asyncOperationId, ServiceClient client)
+        /// <summary>
+        /// For some reason we do not get the actual import job id any more, so we query for it
+        /// instead
+        /// </summary>
+        /// <param name="solutionZipPath">The solution zip path so we can extract the solution name</param>
+        /// <param name="client">CRM Service client</param>
+        /// <returns>The actual import job id</returns>
+        private static Guid FindRealImportJobId(string solutionZipPath, ServiceClient client)
         {
-            AsyncOperation asyncOperation = null;
-            Entity asyncOperationEntity;
-
-            int tries = 0;
-            do
+            using (var zip = ZipFile.OpenRead(solutionZipPath))
             {
-                asyncOperationEntity = client.Retrieve("asyncoperation", asyncOperationId, new ColumnSet(true));
+                var solutionXML = zip.Entries.Where(e => e.Name == "solution.xml").Single();
 
-                asyncOperation = asyncOperationEntity.ToEntity<AsyncOperation>();
+                using (var solutionXMLStream = solutionXML.Open())
+                {
+                    var xdoc = XDocument.Load(solutionXMLStream);
 
-                Thread.Sleep(1500);
-            } while (tries++ < 10 && asyncOperation?.HasStarted() == false);
+                    var solutionName = xdoc.Root.XPathSelectElement("SolutionManifest/UniqueName").Value;
+
+                    var query = new QueryExpression("importjob")
+                    {
+                        ColumnSet = new ColumnSet(true),
+                        NoLock = true
+                    };
+
+                    query.Criteria.AddCondition("solutionname", ConditionOperator.Equal, solutionName);
+                    query.Criteria.AddCondition("completedon", ConditionOperator.Null);
+
+                    query.AddOrder("createdon", OrderType.Descending);
+
+                    EntityCollection queryResult = null;
+
+                    do
+                    {
+                        Thread.Sleep(5000);
+
+                        queryResult = client.RetrieveMultiple(query);
+                    } while (!queryResult.Entities.Any());
+
+                    // Assume that we only have one result.
+                    var importJobEntity = queryResult.Entities.Single();
+
+                    return importJobEntity.Id;
+                }
+            }
         }
-
-        public void Import(FileInfo pathToZipFile)
-        {
-            ServiceClient client = DataverseServicePrincipalCommandLine.Connect();
-
-            ImportAsyncAndWaitWithProgress(client, PathToZipFile.FullName, PublishChanges, DisplayProgressBar);
-        }
-
-        public void Import()
-            => Import(PathToZipFile);
 
         private static bool IsNotNull(ref int numberOfNulls, Entity importJob, Guid importJobId)
         {
@@ -248,12 +243,11 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
 
         private void PrintProgress(ProgressBar progressBar, string message, double currentProgress, string currentProcess)
         {
-            if(DisplayProgressBar)
+            if (DisplayProgressBar)
             {
                 progressBar?.WriteLine(message);
 
                 progressBar?.Tick((int)currentProgress * 100);
-
             }
             else
             {
@@ -266,7 +260,7 @@ namespace DanielsToolbox.Models.CommandLine.Dataverse
                         Console.WriteLine($"##vso[task.complete result=Succeeded;]DONE");
                     }
                 }
-                
+
                 Console.WriteLine(message);
             }
         }
